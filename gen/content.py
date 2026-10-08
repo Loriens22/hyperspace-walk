@@ -21,6 +21,7 @@ REFS = {
  "chsw1985": {"short": "Candelas et al. 1985", "full": "P. Candelas, G. T. Horowitz, A. Strominger, E. Witten, Vacuum configurations for superstrings. Nuclear Physics B 258:46–74, 1985. doi:10.1016/0550-3213(85)90602-9", "url": "https://doi.org/10.1016/0550-3213(85)90602-9"},
  "wiki_rot4": {"short": "Wikipedia: 4D rotations", "full": "Wikipedia, 'Rotations in 4-dimensional Euclidean space' (simple, double and isoclinic rotations), accessed Oct 2026.", "url": "https://en.wikipedia.org/wiki/Rotations_in_4-dimensional_Euclidean_space"},
  "wiki_reg4": {"short": "Wikipedia: Regular 4-polytope", "full": "Wikipedia, 'Regular 4-polytope' and '600-cell' (element counts, coordinates, edge lengths, after Coxeter 1973), accessed Oct 2026.", "url": "https://en.wikipedia.org/wiki/Regular_4-polytope"},
+ "tenbosch2020": {"short": "ten Bosch 2020", "full": "M. ten Bosch, N-Dimensional Rigid Body Dynamics. ACM Transactions on Graphics 39(4), Article 55, 2020 (SIGGRAPH 2020); 4D bodies displayed as real-time 3D slices, as in his game 4D Toys.", "url": "https://marctenbosch.com/ndphysics/"},
  "wiki_4d": {"short": "Wikipedia: 4D space", "full": "Wikipedia, 'Four-dimensional space' (history: Schläfli 1852, Hinton, ana/kata), accessed Oct 2026.", "url": "https://en.wikipedia.org/wiki/Four-dimensional_space"},
 }
 
@@ -282,6 +283,74 @@ LESSONS = [
  {"id": "wlocked", "title_en": "", "title_bg": "", "lines": [
   L("m2", "You can't move in w yet. Visit the first station.", "Още не можеш да се движиш по w. Посети първата станция.",
     bg_tts="Още не можеш да се движиш по дабъл ю. Посети първата станция."),
+ ]},
+ {"id": "hint_walk", "title_en": "Hint", "title_bg": "Подсказка", "lines": [
+  L("h1", "Follow the glowing beacon ahead. Walk with W A S D, or with the left thumb joystick on a touch screen.",
+         "Следвай светещия маяк напред. Ходи с W A S D или с левия джойстик на сензорен екран.",
+         bg_tts="Следвай светещия маяк напред. Ходи с клавишите W A S D или с левия джойстик на сензорен екран."),
+ ]},
+ {"id": "hint_door", "title_en": "Hint", "title_bg": "Подсказка", "lines": [
+  L("h2", "The wall exists only for w between −0.6 and +0.6. Hold E, or W+ on touch, until the gauge on the left shows about +2, then walk straight through.",
+         "Стената съществува само за w между −0,6 и +0,6. Задръж E или W+ на сензорен екран, докато уредът вляво покаже около +2, и после мини право през нея.",
+         en_tts="The wall exists only for w between minus zero point six and plus zero point six. Hold E, or W plus on touch, until the gauge on the left shows about plus two, then walk straight through.",
+         bg_tts="Стената съществува само за дабъл ю между минус нула цяло и шест и плюс нула цяло и шест. Задръж Е или дабъл ю плюс, докато уредът вляво покаже около плюс две, и после мини право през нея."),
+ ]},
+ {"id": "hint_bridge", "title_en": "Hint", "title_bg": "Подсказка", "lines": [
+  L("h3", "The bridge exists only for w between 1.4 and 2.6. Keep your w near +2 while you cross. If you fall, you will respawn here.",
+         "Мостът съществува само за w между 1,4 и 2,6. Дръж w около +2, докато преминаваш. Ако паднеш, ще се появиш отново тук.",
+         en_tts="The bridge exists only for w between one point four and two point six. Keep your w near plus two while you cross. If you fall, you will respawn here.",
+         bg_tts="Мостът съществува само за дабъл ю между едно цяло и четири и две цяло и шест. Дръж дабъл ю около плюс две, докато преминаваш. Ако паднеш, ще се появиш отново тук."),
+ ]},
+ {"id": "hint_gate", "title_en": "Hint", "title_bg": "Подсказка", "lines": [
+  L("h4", "Stand next to the lock. Choose the yw plane, key 5 or the plane button, then turn +15° three times. The slice becomes 1 × √2 × 1.",
+         "Застани до ключалката. Избери равнината yw, клавиш 5 или бутона за равнина, и завърти три пъти по +15°. Сечението става 1 × √2 × 1.",
+         en_tts="Stand next to the lock. Choose the y w plane, key five or the plane button, then turn plus fifteen degrees three times. The slice becomes one by root two by one.",
+         bg_tts="Застани до ключалката. Избери равнината игрек дабъл ю, клавиш пет или бутона за равнина, и завърти три пъти по петнайсет градуса. Сечението става едно по корен от две по едно."),
+ ]},
+ {"id": "skipped", "title_en": "Skipped", "title_bg": "Пропуснато", "lines": [
+  L("h5", "All right, I have solved this one for you. You can come back and try it any time.",
+         "Добре, реших това вместо теб. Можеш да се върнеш и да опиташ по всяко време."),
+ ]},
+ {"id": "realm", "title_en": "4D Space", "title_bg": "4D пространство", "lines": [
+  L("r1", "Welcome to 4D Space. Everything here is defined by four coordinates, x, y, z and w. This is not a slice of the main world: it is a whole four-dimensional scene.",
+         "Добре дошъл в 4D пространството. Всичко тук е зададено с четири координати: x, y, z и w. Това не е сечение на основния свят, а цяла четириизмерна сцена.",
+         refs=["wiki_4d"], bg_tts="Добре дошъл в четири Д пространството. Всичко тук е зададено с четири координати: икс, игрек, зет и дабъл ю. Това не е сечение на основния свят, а цяла четириизмерна сцена."),
+  L("r2", "To be honest, no one can see four dimensions. Our eyes have 2D retinas. A 4D creature would have a 3D retina, and would see whole volumes at once, including the insides of closed 3D boxes.",
+         "Честно казано, никой не може да вижда четири измерения. Очите ни имат двумерни ретини. Едно 4D същество би имало тримерна ретина и би виждало цели обеми наведнъж, включително вътрешността на затворени 3D кутии.",
+         refs=["abbott1884", "hinton1904"], bg_tts="Честно казано, никой не може да вижда четири измерения. Очите ни имат двумерни ретини. Едно четириизмерно същество би имало тримерна ретина и би виждало цели обеми наведнъж, включително вътрешността на затворени кутии."),
+  L("r3", "The 4D Eye view approximates that retina. Every point is projected in perspective from your 4D position onto a 3D volume, divided by its 4D distance ahead. Brighter means closer. Orbit the retina to inspect it.",
+         "Изгледът „4D око“ приближава тази ретина. Всяка точка се проектира перспективно от твоята 4D позиция върху тримерен обем, като се дели на 4D разстоянието напред. По-ярко значи по-близо. Завърти ретината, за да я разгледаш.",
+         refs=["hanson1992", "banchoff1990"], bg_tts="Изгледът четири Д око приближава тази ретина. Всяка точка се проектира перспективно от твоята позиция върху тримерен обем, като се дели на разстоянието напред. По-ярко значи по-близо. Завърти ретината, за да я разгледаш."),
+  L("r4", "The Slice view is what a 3D being like you would perceive: the cut of the world by your own 3D hyperplane. Turning in the xw, yw or zw planes tilts that hyperplane, and the world morphs, as in Marc ten Bosch's 4D Toys.",
+         "Изгледът „сечение“ е това, което би възприемало тримерно същество като теб: разрезът на света с твоята собствена тримерна хиперравнина. Въртенето в равнините xw, yw или zw накланя тази хиперравнина и светът се преобразява, както в 4D Toys на Марк тен Бош.",
+         refs=["tenbosch2020", "banchoff1990"], en_tts="The Slice view is what a 3D being like you would perceive: the cut of the world by your own 3D hyperplane. Turning in the x w, y w or z w planes tilts that hyperplane, and the world morphs, as in Marc ten Bosch's 4D Toys.",
+         bg_tts="Изгледът сечение е това, което би възприемало тримерно същество като теб: разрезът на света с твоята собствена хиперравнина. Въртенето в равнините с ос дабъл ю накланя тази хиперравнина и светът се преобразява, както в играта четири Д тойс на Марк тен Бош."),
+  L("r5", "Find the four w-crystals. Spot them with the 4D Eye, then move ana and kata, and turn towards directions that do not exist in 3D.",
+         "Намери четирите w-кристала. Открий ги с 4D окото, после се движи ана и ката и се обръщай в посоки, които не съществуват в 3D.",
+         bg_tts="Намери четирите кристала. Открий ги с окото, после се движи ана и ката и се обръщай в посоки, които не съществуват в три измерения."),
+  L("r6", "There is also a sealed box. In a slice, its walls hide what is inside. Step around it through w, and look into it from the w direction, as Abbott's Sphere looked into a Flatlander's house.",
+         "Има и запечатана кутия. В сечение стените ѝ скриват какво има вътре. Заобиколи я през w и погледни в нея откъм посоката w, както Сферата на Абот надниква в къщата на плоскоземец.",
+         refs=["abbott1884"], bg_tts="Има и запечатана кутия. В сечение стените ѝ скриват какво има вътре. Заобиколи я през дабъл ю и погледни в нея откъм тази посока, както Сферата на Абот надниква в къщата на плоскоземец."),
+ ]},
+ {"id": "realm_box", "title_en": "Inside the box", "title_bg": "Вътре в кутията", "lines": [
+  L("rb1", "You are looking into the closed box from the w direction. Every point of its inside is visible at once, just as the inside of a square is visible to us from above.",
+         "Гледаш в затворената кутия откъм посоката w. Всяка точка от вътрешността ѝ се вижда наведнъж, точно както ние виждаме вътрешността на квадрат отгоре.",
+         refs=["abbott1884", "hinton1904"], bg_tts="Гледаш в затворената кутия откъм четвъртата посока. Всяка точка от вътрешността ѝ се вижда наведнъж, точно както ние виждаме вътрешността на квадрат отгоре."),
+ ]},
+ {"id": "realm_crystal", "title_en": "w-crystal", "title_bg": "w-кристал", "lines": [
+  L("rc1", "A w-crystal! Its shape is a 16-cell, the four-dimensional cross-polytope.",
+         "W-кристал! Формата му е 16-клетъчник, четириизмерният кросполитоп.", refs=["coxeter1973"],
+         bg_tts="Кристал! Формата му е шестнайсет клетъчник, четириизмерният кросполитоп."),
+ ]},
+ {"id": "realm_room", "title_en": "The tesseract room", "title_bg": "Стаята-тесеракт", "lines": [
+  L("rr1", "You have touched all eight cubic cells of the tesseract room. A tesseract is bounded by eight cubes, just as a cube is bounded by six squares.",
+         "Докосна и осемте кубични клетки на стаята-тесеракт. Тесерактът е ограничен от осем куба, точно както кубът е ограничен от шест квадрата.",
+         refs=["coxeter1973", "hinton1904"]),
+ ]},
+ {"id": "realm_done", "title_en": "All crystals", "title_bg": "Всички кристали", "lines": [
+  L("rd1", "All four crystals found. You have used a 4D eye and a 3D slice, the two main ways people approximate four-dimensional vision.",
+         "Намери и четирите кристала. Използва 4D око и тримерно сечение, двата основни начина, по които хората приближават четириизмерното зрение.",
+         refs=["hanson1992", "tenbosch2020"], bg_tts="Намери и четирите кристала. Използва четириизмерно око и тримерно сечение, двата основни начина, по които хората приближават четириизмерното зрение."),
  ]},
 ]
 
