@@ -240,6 +240,11 @@ func _process(delta: float) -> void:
 	_was_captured = cap
 	if director.current != "" and st.has(director.current):
 		aether.focus_point = st[director.current].focus_point()
+	if args.has("aethercam"):
+		title_cam.current = true
+		var f := player.forward()
+		title_cam.global_position = aether.global_position + f * 1.5 + Vector3(-0.5, 0.25, 0)
+		title_cam.look_at(aether.global_position)
 	_triggers()
 	_checkpoints()
 	ui.objective_text = _objective()
