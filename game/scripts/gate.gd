@@ -108,7 +108,7 @@ func _process(_d: float) -> void:
 		if not intro_said:
 			intro_said = true
 			get_tree().call_group("director", "play", "lock")
-		elif turns >= 3 and not hint1:
+		elif turns >= 3 and not hint1 and lock.pending_steps() == 0:
 			hint1 = true; get_tree().call_group("director", "play", "lock_hint")
-		elif turns >= 8 and not hint2:
+		elif turns >= 8 and not hint2 and lock.pending_steps() == 0:
 			hint2 = true; get_tree().call_group("director", "play", "lock_hint2")

@@ -10,7 +10,8 @@ const MODES_EN := ["perspective", "orthographic", "stereographic"]
 const MODES_BG := ["перспективна", "ортогонална", "стереографска"]
 
 func _process(_d: float) -> void:
-	if not player or not G.playing or G.paused: return
+	if not player or not G.playing or G.paused:
+		focused = null; return
 	var best: PolyView = null
 	var bd := 7.5
 	for n in get_tree().get_nodes_in_group("rotatable"):

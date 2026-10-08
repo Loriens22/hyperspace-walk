@@ -39,6 +39,7 @@ func _ready() -> void:
 			l.position = Vector3(0, size.y * 0.5 + 0.45, side * (size.z * 0.5 + 0.02))
 			if side < 0: l.rotation.y = PI
 			l.no_depth_test = false
+			l.double_sided = false
 			add_child(l)
 
 func contains_w(w: float) -> bool:

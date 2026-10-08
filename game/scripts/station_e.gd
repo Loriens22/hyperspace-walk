@@ -16,6 +16,7 @@ var info: Label3D
 func _ready() -> void:
 	lesson_id = "E"; requires = "D"
 	build_terminal("V · Curved space & extra dimensions", "V · Изкривено пространство и измерения")
+	title_label.position.y = 5.3
 	focus_offset = Vector3(0, 2.6, 1.2)
 	sphere_node = Node3D.new(); sphere_node.position = Vector3(-2.9, 2.3, 0.2); add_child(sphere_node)
 	var sm := SphereMesh.new(); sm.radius = SR; sm.height = SR * 2

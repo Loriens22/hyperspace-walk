@@ -47,6 +47,10 @@ func _ready() -> void:
 	manip = Manipulator.new(); manip.player = player; add_child(manip)
 	title_cam = Camera3D.new(); title_cam.fov = 60; title_cam.far = 900; add_child(title_cam)
 	ui = UI.new(); ui.director = director; ui.manip = manip; add_child(ui)
+	# main handles menu input while the tree is paused; everything else in the world pauses
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	for c in get_children():
+		if c != ui: c.process_mode = Node.PROCESS_MODE_PAUSABLE
 	director.line_started.connect(func(id, ln): ui.set_line(id, ln); aether.speaking = true)
 	director.line_cleared.connect(func(): ui.clear_line(); aether.speaking = false)
 	director.lesson_started.connect(_on_lesson_started)
@@ -120,8 +124,23 @@ func _new_game() -> void:
 				player.global_position = CPS[i]["pos"]; _cp_index = i
 		if args["cp"] == "gate": player.global_position = Vector3(1.5, 0.3, -64.0)
 	if args.has("w"): G.player_w = float(args["w"])
+	if args.has("pos"):
+		var c: PackedStringArray = args["pos"].split(",")
+		player.global_position = Vector3(float(c[0]), float(c[1]), float(c[2]))
+	if args.has("yaw"): player.yaw = deg_to_rad(float(args["yaw"]))
+	if args.has("pitch"): player.pitch = deg_to_rad(float(args["pitch"]))
+	if args.has("gate"): G.gate_open = true; gate._open(true)
+	if args.has("donetill"):
+		for id in ["intro", "A", "door", "door_ok", "B", "C", "lock", "lock_ok", "D", "E"]:
+			G.lessons_done[id] = true
+			if id == "A": G.w_unlocked = true
+			if id == "C": G.rot_unlocked = true
+			if id == "lock_ok": G.gate_open = true; gate._open(true)
+			if id == args["donetill"]: break
 	if args.has("lesson"):
-		get_tree().create_timer(1.0).timeout.connect(func(): director.play(args["lesson"]))
+		get_tree().create_timer(1.0).timeout.connect(func():
+			director.play(args["lesson"])
+			for i in int(args.get("skipto", "0")): director._next())
 	elif not G.lessons_done.has("intro"):
 		get_tree().create_timer(1.2).timeout.connect(func(): director.play("intro"))
 
@@ -182,7 +201,7 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("menu"):
 		if ui.log_panel.visible or ui.settings_panel.visible:
 			ui.log_panel.visible = false; ui.settings_panel.visible = false
-			if not G.paused: _set_paused(false)
+			if G.paused: ui.show_pause(true)
 		else:
 			_set_paused(not G.paused)
 	elif e.is_action_pressed("lang"):
@@ -203,11 +222,15 @@ func _process(delta: float) -> void:
 		if fps_label.visible: fps_label.text = "%d fps" % Engine.get_frames_per_second()
 	if _fps_t > 10.0:
 		_fps_t = 0.0
-		print("[fps] %d proc=%.1fms phys=%.1fms playing=%s paused=%s lesson=%s w=%.2f pos=%s" % [Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, G.playing, G.paused, director.current, G.player_w, player.global_position.snapped(Vector3.ONE * 0.1)])
+		print("[fps] focus=%s %d proc=%.1fms phys=%.1fms playing=%s paused=%s lesson=%s w=%.2f pos=%s" % [manip.focused.get_path() if manip.focused else "-", Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, G.playing, G.paused, director.current, G.player_w, player.global_position.snapped(Vector3.ONE * 0.1)])
+	if G.paused:
+		if G.playing and not ui.log_panel.visible and not ui.settings_panel.visible and not ui.pause_menu.visible:
+			ui.show_pause(true)
+		return
 	if not G.playing:
 		_title_t += delta * 0.08
-		var c := Vector3(0, 3.0, -12.0)
-		title_cam.global_position = c + Vector3(sin(_title_t) * 11.0, 2.2 + sin(_title_t * 0.7) * 1.2, cos(_title_t) * 11.0)
+		var c := Vector3(0, 2.6, -18.0)
+		title_cam.global_position = c + Vector3(sin(_title_t) * 9.5, 1.6 + sin(_title_t * 0.7) * 0.8, cos(_title_t) * 9.5)
 		title_cam.look_at(c + Vector3(0, 0.5, 0))
 		return
 	# pointer lock lost (browser Esc) -> pause menu

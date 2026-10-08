@@ -78,7 +78,7 @@ func run() -> void:
 	_say("C started=%s" % await _wait_lesson("C"))
 	await _skip_lesson()
 	_say("C done rot_unlocked=%s" % G.rot_unlocked)
-	ok = await _path([Vector3(1.2, 0, -64), Vector3(0, 0, -69), Vector3(0, 0, -71.5)], 400); _say("walk into gate (expect blocked) ok=%s gate_open=%s" % [ok, G.gate_open])
+	ok = await _path([Vector3(1.2, 0, -64), Vector3(0, 0, -69), Vector3(0, 0, -73.0)], 400); _say("walk into gate (expect blocked) ok=%s gate_open=%s" % [ok, G.gate_open])
 	ok = await _goto(Vector3(1.0, 0, -66.5)); _say("at lock ok=%s focus=%s" % [ok, m.manip.focus_text().replace("\n", " / ")])
 	await _tap("plane5")
 	for i in 3:
