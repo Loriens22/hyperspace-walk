@@ -19,6 +19,11 @@ var _fps_t := 0.0
 var fps_label: Label
 var task_id := ""
 var task_t := 0.0
+var realm: Realm4D
+var realm_from_title := false
+var portal: Node3D
+var _portal_cool := 0.0
+const PORTAL_POS := Vector3(-3.6, 0.0, -1.5)
 
 const CPS := [
 	{"id": "hub", "z": 99.0, "pos": Vector3(0, 0.3, 3.5), "w": 0.0},
@@ -48,7 +53,10 @@ func _ready() -> void:
 	director = Director.new(); add_child(director)
 	manip = Manipulator.new(); manip.player = player; add_child(manip)
 	title_cam = Camera3D.new(); title_cam.fov = 60; title_cam.far = 900; add_child(title_cam)
+	realm = Realm4D.new(); realm.director = director; add_child(realm)
+	_build_portal()
 	ui = UI.new(); ui.director = director; ui.manip = manip; add_child(ui)
+	ui.realm = realm; realm.ui = ui; ui.touch.realm = realm
 	# main handles menu input while the tree is paused; everything else in the world pauses
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	for c in get_children():
@@ -69,6 +77,8 @@ func _ready() -> void:
 	ui.skip_hint.connect(_on_skip_hint)
 	ui.skip_anyway.connect(_on_skip_anyway)
 	ui.skip_cancel.connect(_close_skip_dialog)
+	ui.realm_requested.connect(_on_realm_requested)
+	realm.exit_requested.connect(_leave_realm)
 	title_cam.current = true
 	G.playing = false
 	G.settings_changed.connect(_apply_gfx)
@@ -91,6 +101,8 @@ func _ready() -> void:
 		_new_game.call_deferred()
 	if args.has("skiptest"):
 		_skiptest.call_deferred()
+	if args.has("realm"):
+		(func(): _enter_realm(true)).call_deferred()
 	if args.has("bot"):
 		var b := Node.new(); b.set_script(load("res://scripts/bot.gd")); b.m = self; add_child(b)
 		b.run.call_deferred()
@@ -175,6 +187,10 @@ func _continue() -> void:
 	G.toast.emit(G.T("Expedition resumed", "Експедицията продължава"))
 
 func _quit_to_title() -> void:
+	if G.in_realm:
+		_set_paused(false)
+		_leave_realm()
+		if not G.playing: return
 	_save()
 	_set_paused(false)
 	G.playing = false
@@ -185,7 +201,7 @@ func _quit_to_title() -> void:
 	ui.show_title()
 
 func _save() -> void:
-	if G.playing: G.save_game(player.global_position, player.yaw)
+	if G.playing and not (G.in_realm and realm_from_title): G.save_game(player.global_position, player.yaw)
 
 func _set_paused(on: bool) -> void:
 	G.paused = on
@@ -224,7 +240,7 @@ func _unhandled_input(e: InputEvent) -> void:
 		elif e is InputEventKey and e.pressed and not e.echo and e.physical_keycode == KEY_1: _on_skip_hint()
 		elif e is InputEventKey and e.pressed and not e.echo and (e.physical_keycode == KEY_2 or e.physical_keycode == KEY_K): _on_skip_anyway()
 		return
-	if e.is_action_pressed("skip") and not G.paused and ui.skip_btn.visible:
+	if e.is_action_pressed("skip") and not G.paused and ui.skip_btn.visible and not G.in_realm:
 		_on_skip_requested(); return
 	if e.is_action_pressed("menu"):
 		if ui.log_panel.visible or ui.settings_panel.visible:
@@ -250,7 +266,7 @@ func _process(delta: float) -> void:
 		if fps_label.visible: fps_label.text = "%d fps" % Engine.get_frames_per_second()
 	if _fps_t > 5.0:
 		_fps_t = 0.0
-		print("[fps] focus=%s %d proc=%.1fms phys=%.1fms playing=%s paused=%s lesson=%s w=%.2f yaw=%.2f touch=%s pos=%s" % [manip.focused.get_path() if manip.focused else "-", Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, G.playing, G.paused, director.current, G.player_w, player.yaw, G.touch_active(), player.global_position.snapped(Vector3.ONE * 0.1)])
+		print("[fps] focus=%s %d proc=%.1fms phys=%.1fms playing=%s paused=%s lesson=%s w=%.2f yaw=%.2f touch=%s pos=%s realm=%s" % [manip.focused.get_path() if manip.focused else "-", Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, G.playing, G.paused, director.current, G.player_w, player.yaw, G.touch_active(), player.global_position.snapped(Vector3.ONE * 0.1), ("%s view=%d A=%s" % [realm.pos.snapped(Vector4.ONE * 0.1), realm.view, realm.A.snapped(Vector4.ONE * 0.01)]) if G.in_realm else "-"])
 	if G.paused:
 		if G.playing and not ui.log_panel.visible and not ui.settings_panel.visible and not ui.pause_menu.visible and not ui.skip_dialog.visible:
 			ui.show_pause(true)
@@ -266,6 +282,10 @@ func _process(delta: float) -> void:
 	if _was_captured and not cap and not G.paused:
 		_set_paused(true)
 	_was_captured = cap
+	if G.in_realm:
+		ui.set_skip("")
+		return
+	_portal_check(delta)
 	if director.current != "" and st.has(director.current):
 		aether.focus_point = st[director.current].focus_point()
 	if args.has("aethercam"):
@@ -313,6 +333,83 @@ func _objective() -> String:
 	if not d.has("D"): return G.T("Enter the gallery of the six regular polytopes", "Влез в галерията на шестте правилни политопа")
 	if not d.has("E"): return G.T("Continue to Station V", "Продължи към Станция V")
 	return G.T("Explore freely · try C and X on the polytopes · J = Research Log", "Изследвай свободно · пробвай C и X върху политопите · J = дневник")
+
+# ------------------------------------------------------------------ 4D realm ("Enter 4D Space")
+func _build_portal() -> void:
+	portal = Node3D.new(); portal.position = PORTAL_POS; portal.rotation.y = deg_to_rad(35.0)
+	world.add_child(portal)
+	var ring := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 1.05; tm.outer_radius = 1.2
+	tm.rings = 48; ring.mesh = tm; ring.rotation.x = PI / 2.0; ring.position.y = 1.45
+	var m := StandardMaterial3D.new(); m.albedo_color = Color(1.0, 0.4, 0.9); m.emission_enabled = true
+	m.emission = Color(1.0, 0.35, 0.85); m.emission_energy_multiplier = 3.0
+	ring.material_override = m; portal.add_child(ring)
+	var pv := PolyView.new().setup("tesseract", 0.75)
+	pv.position = Vector3(0, 1.45, 0); pv.spin = [[2, 0.5], [3, 0.35]]
+	portal.add_child(pv)
+	var l := Label3D.new(); l.text = "✦ ENTER 4D SPACE"; l.font_size = 64; l.pixel_size = 0.006; l.outline_size = 12
+	l.modulate = Color(1.0, 0.65, 0.95); l.position = Vector3(0, 3.0, 0); l.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	portal.add_child(l)
+	var lt := OmniLight3D.new(); lt.light_color = Color(1.0, 0.4, 0.9); lt.light_energy = 1.5; lt.omni_range = 4.0; lt.position.y = 1.4
+	portal.add_child(lt)
+
+func _portal_check(delta: float) -> void:
+	_portal_cool = maxf(_portal_cool - delta, 0.0)
+	var p := player.global_position
+	if _portal_cool <= 0.0 and Vector2(p.x - PORTAL_POS.x, p.z - PORTAL_POS.z).length() < 1.0 and p.y < 2.0:
+		_enter_realm(false)
+
+func _on_realm_requested() -> void:
+	if G.in_realm:
+		_set_paused(false); _leave_realm(); return
+	if G.paused: _set_paused(false)
+	_enter_realm(not G.playing)
+
+func _set_world_active(on: bool) -> void:
+	for n in [world, gate, player, aether, manip, portal]:
+		if n is Node3D and n != portal: n.visible = on
+		n.process_mode = Node.PROCESS_MODE_PAUSABLE if on else Node.PROCESS_MODE_DISABLED
+	for k in st:
+		st[k].visible = on
+		st[k].process_mode = Node.PROCESS_MODE_PAUSABLE if on else Node.PROCESS_MODE_DISABLED
+
+func _enter_realm(from_title: bool) -> void:
+	if G.in_realm: return
+	realm_from_title = from_title
+	if not from_title: _save()
+	G.in_realm = true
+	_set_world_active(false)
+	if from_title:
+		G.playing = true
+		G.start_music()
+	ui.show_game()
+	ui.set_skip("")
+	realm.enter()
+	G.play_sfx("unlock")
+	print("[realm] entered from=%s" % ("title" if from_title else "game"))
+
+func _leave_realm() -> void:
+	if not G.in_realm: return
+	realm.leave()
+	G.in_realm = false
+	_set_world_active(true)
+	for id in ["realm", "realm_box", "realm_crystal", "realm_room", "realm_done"]:
+		if director.current == id: director.skip_lesson()
+		director.queue.erase(id)
+	if realm_from_title:
+		G.playing = false
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		title_cam.current = true
+		ui.show_title()
+	else:
+		player.cam.current = true
+		ui.show_game()
+		var away := Vector3(PORTAL_POS.x + 2.2, 0.3, PORTAL_POS.z + 1.6)
+		if player.global_position.distance_to(PORTAL_POS) < 2.0:
+			player.global_position = away; player.velocity = Vector3.ZERO
+		aether.teleport_to_player()
+		_portal_cool = 3.0
+	G.toast.emit(G.T("Back in 3D (+w slices) · progress kept", "Обратно в 3D · прогресът е запазен"))
+	print("[realm] left to=%s" % ("title" if realm_from_title else "game"))
 
 # ------------------------------------------------------------------ skip puzzle / task
 const PUZZLES := ["door", "bridge", "gate"]

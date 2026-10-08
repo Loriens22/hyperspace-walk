@@ -20,6 +20,7 @@ var heard := {}            # line id -> true (Research Log)
 var lang := "en"
 var playing := false       # in-game (not title)
 var paused := false
+var in_realm := false      # inside the 4D realm ("Enter 4D Space")
 var settings := {"sens": 0.25, "subs": 22, "reduced_motion": false, "colorblind": false, "subtitles": true,
 	"music": 0.7, "voice": 1.0, "sfx": 0.8, "hints": true, "low_gfx": false, "fps": false,
 	"touch_mode": 0, "touch_sens": 1.0, "perf_auto_done": false}
@@ -93,6 +94,9 @@ func _setup_inputs() -> void:
 	_key("pause_line", [KEY_P]); _key("replay", [KEY_T]); _key("next_line", [KEY_N, KEY_ENTER])
 	_key("rot_plus", [KEY_R]); _key("rot_minus", [KEY_F]); _key("rot_reset", [KEY_0])
 	_key("slice", [KEY_X]); _key("proj", [KEY_C]); _key("hints", [KEY_H]); _key("menu", [KEY_ESCAPE]); _key("skip", [KEY_K])
+	# 4D realm: turns in the observer's xw / yw / zw planes (same keys as the gate's plane chips), extras
+	_key("t_xw_m", [KEY_1]); _key("t_xw_p", [KEY_2]); _key("t_yw_m", [KEY_3]); _key("t_yw_p", [KEY_4])
+	_key("t_zw_m", [KEY_5]); _key("t_zw_p", [KEY_6]); _key("r_fog", [KEY_G]); _key("r_orbit", [KEY_O]); _key("r_exit", [KEY_BACKSPACE])
 	for i in 6:
 		_key("plane%d" % (i + 1), [KEY_1 + i])
 

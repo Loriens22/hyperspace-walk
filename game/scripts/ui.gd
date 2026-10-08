@@ -49,6 +49,7 @@ var _toast_t := 0.0
 var _log_ids: Array = []
 var objective_text := ""
 var touch: TouchUI
+var realm: Realm4D
 var w_panel: PanelContainer
 var obj_panel: PanelContainer
 var title_box: VBoxContainer
@@ -242,6 +243,8 @@ func _build_title() -> void:
 	var sp := Control.new(); sp.custom_minimum_size = Vector2(0, 18); v.add_child(sp)
 	var nb := _btn("", func(): new_game.emit()); nb.name = "New"; v.add_child(nb)
 	continue_btn = _btn("", func(): continue_game.emit()); continue_btn.name = "Cont"; v.add_child(continue_btn)
+	var rb := _btn("", func(): realm_requested.emit()); rb.name = "Realm4D"; v.add_child(rb)
+	rb.add_theme_color_override("font_color", Color(1.0, 0.6, 0.92))
 	var sb := _btn("", func(): open_settings()); sb.name = "Set"; v.add_child(sb)
 	var lb := _btn("", func(): open_log()); lb.name = "Log"; v.add_child(lb)
 	var lang := _btn("", func(): G.set_lang("bg" if G.lang == "en" else "en")); lang.name = "Lang"; v.add_child(lang)
@@ -443,6 +446,8 @@ func show_game() -> void:
 
 func show_pause(on: bool) -> void:
 	pause_menu.visible = on
+	(pause_menu.find_child("Skip", true, false) as Button).visible = not G.in_realm
+	(pause_menu.find_child("Realm", true, false) as Button).text = G.T("Leave 4D Space", "Излез от 4D пространството") if G.in_realm else G.T("Enter 4D Space", "Влез в 4D пространството")
 	if on: _print_menus.call_deferred()
 	if not on:
 		settings_panel.visible = false; log_panel.visible = false
@@ -508,6 +513,7 @@ func _relabel() -> void:
 	(title.find_child("New", true, false) as Button).text = G.T("New expedition", "Нова експедиция")
 	continue_btn.text = G.T("Continue", "Продължи")
 	(title.find_child("Set", true, false) as Button).text = G.T("Settings", "Настройки")
+	(title.find_child("Realm4D", true, false) as Button).text = G.T("✦ Enter 4D Space", "✦ Влез в 4D пространството")
 	(title.find_child("Log", true, false) as Button).text = G.T("Research Log", "Изследователски дневник")
 	(title.find_child("Lang", true, false) as Button).text = "Language: English  ⇄  Български" if G.lang == "en" else "Език: Български  ⇄  English"
 	(title.find_child("Foot", true, false) as Label).text = G.T("Made with Blender + Godot · voice: neural TTS · Click a button to begin (enables sound)", "Създадено с Blender + Godot · глас: невронен TTS · Натисни бутон, за да започнеш (включва звука)")
@@ -565,6 +571,11 @@ func _process(delta: float) -> void:
 	w_marker.color = CYAN.lerp(MAG, clamp(w / 6.0 + 0.5, 0.0, 1.0))
 	w_lock.text = "" if G.w_unlocked else G.T("w locked", "w заключено")
 	objective.text = touchify(objective_text)
+	if G.in_realm:
+		w_panel.visible = false; focus_panel.visible = false; crosshair.visible = false; skip_btn.visible = false
+		hints.text = realm.hints() if realm else ""
+		return
+	w_panel.visible = true
 	crosshair.visible = not get_tree().get_first_node_in_group("player").third_person
 	var ft := manip.focus_text() if manip else ""
 	focus_panel.visible = ft != ""
@@ -695,7 +706,8 @@ func _print_menus() -> void:
 	var V := get_viewport().get_visible_rect().size
 	var out := []
 	for pair in [["new", title.find_child("New", true, false)], ["tlog", title.find_child("Log", true, false)],
-			["tset", title.find_child("Set", true, false)], ["resume", pause_menu.find_child("Resume", true, false)],
+			["tset", title.find_child("Set", true, false)], ["trealm", title.find_child("Realm4D", true, false)],
+			["prealm", pause_menu.find_child("Realm", true, false)], ["pskip", pause_menu.find_child("Skip", true, false)], ["resume", pause_menu.find_child("Resume", true, false)],
 			["psettings", pause_menu.find_child("Settings", true, false)], ["pquit", pause_menu.find_child("Quit", true, false)],
 			["sclose", settings_panel.find_child("Close", true, false)], ["stouch", settings_panel.find_child("TouchMode", true, false)]]:
 		var c: Control = pair[1]

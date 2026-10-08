@@ -8,6 +8,8 @@ var player: Player
 var manip: Manipulator
 var director: Director
 var ui: UI
+var realm: Realm4D
+var _was_realm := false
 
 const JOY_R := 85.0
 const KNOB_R := 36.0
@@ -76,8 +78,18 @@ func layout() -> void:
 	_b("menu", Vector2(R - 28, ty), 28, "≡", "menu", "tap", cyan)
 	_b("log", Vector2(R - 90, ty), 28, G.T("LOG", "ДНЕВ"), "log", "tap", cyan)
 	_b("cam", Vector2(R - 152, ty), 28, "1P/3P", "cam", "tap", cyan)
+	# 4D realm set: up/down, six 4D turn buttons, view / orbit / exit
+	_b("r_up", A, 50, G.T("UP", "ГОРЕ"), "jump", "hold", cyan)
+	_b("r_down", A + Vector2(-128, 14), 38, G.T("DOWN", "ДОЛУ"), "crouch", "hold", cyan)
+	var step: float = minf(70.0, (R - L - 40.0) / 6.0)
+	var tnames := [["t_zw_p", "zw+"], ["t_zw_m", "zw−"], ["t_yw_p", "yw+"], ["t_yw_m", "yw−"], ["t_xw_p", "xw+"], ["t_xw_m", "xw−"]]
+	for i in 6:
+		_b(tnames[i][0], Vector2(R - 34 - i * step, ry), minf(31.0, step * 0.45), tnames[i][1], tnames[i][0], "hold", gold if i >= 4 else (mag if i < 2 else Color(0.6, 0.8, 1.0)))
+	_b("r_view", Vector2(R - 90, ty), 28, G.T("VIEW", "ИЗГЛ"), "cam", "tap", gold)
+	_b("r_orbit", Vector2(R - 152, ty), 28, G.T("ORBIT", "ОРБ"), "", "orbit", gold)
+	_b("r_exit", Vector2(R - 214, ty), 28, G.T("EXIT", "ИЗХОД"), "r_exit", "tap", mag)
 	var ax := R - 228.0; var ay := ty
-	if portrait: ax = R - 28.0; ay = ty + 64.0          # second row in portrait (top-left holds the objective)
+	if portrait or G.in_realm: ax = R - 28.0; ay = ty + 64.0   # second row (portrait: objective top-left; realm: realm buttons)
 	_b("next", Vector2(ax, ay), 26, "»", "next_line", "tap", mag)
 	_b("replay", Vector2(ax - 60, ay), 26, "↺", "replay", "tap", mag)
 	_b("pause_line", Vector2(ax - 120, ay), 26, "II", "pause_line", "tap", mag)
@@ -90,6 +102,12 @@ func focus_y() -> float:
 
 # ------------------------------------------------------------------ visibility
 func _btn_visible(id: String) -> bool:
+	if id.begins_with("r_") or id.begins_with("t_"): return G.in_realm
+	if G.in_realm:
+		match id:
+			"ana", "kata", "menu": return true
+			"next", "replay", "pause_line": return director != null and director.current != ""
+		return false
 	match id:
 		"ana", "kata": return G.w_unlocked
 		"rot_plus", "rot_minus", "plane", "proj": return G.rot_unlocked and manip != null and manip.focused != null
@@ -107,6 +125,8 @@ func _process(_d: float) -> void:
 		visible = show
 		if not show: _release_all()
 	if not show: return
+	if G.in_realm != _was_realm:
+		_was_realm = G.in_realm; layout()
 	# keep the crouch toggle honest and refresh dynamic labels
 	if buttons.has("plane") and manip:
 		buttons["plane"]["label"] = P4.PLANE_NAMES[manip.plane]
@@ -178,6 +198,9 @@ func _input(e: InputEvent) -> void:
 		_last[sd.index] = sd.position
 		if role == "joy":
 			_update_joy(sd.position)
+		elif role == "look" and G.in_realm and realm:
+			var k: float = 0.0045 * float(G.settings.get("touch_sens", 1.0))
+			realm.touch_look(rel.limit_length(120.0) * k)
 		elif role == "look" and player:
 			var k: float = 0.0045 * float(G.settings.get("touch_sens", 1.0))
 			rel = rel.limit_length(120.0)
@@ -217,6 +240,8 @@ func _press_button(id: String) -> void:
 			_tap(b["action"])
 		"toggle":
 			crouch_on = not crouch_on; _send(b["action"], crouch_on)
+		"orbit":
+			if realm: realm.touch_orbit = not realm.touch_orbit
 		"plane":
 			if manip: _tap("plane%d" % ((manip.plane + 1) % 6 + 1))
 
@@ -229,6 +254,7 @@ func _release_button(id: String) -> void:
 # ------------------------------------------------------------------ drawing
 func _is_down(id: String) -> bool:
 	if id == "crouch": return crouch_on
+	if id == "r_orbit": return realm != null and realm.touch_orbit
 	return touches.values().has(id)
 
 func _draw() -> void:
