@@ -27,9 +27,9 @@ var pitch := 0.0
 var R := Rh; var U := Uh; var F := Fh; var A := Ah
 var view := 0                        # 0 = 4D Eye (retina), 1 = Slice
 var fog := true
-var orbit_yaw := 0.55
+var orbit_yaw := 0.75
 var orbit_pitch := 0.38
-var orbit_dist := 3.6
+var orbit_dist := 4.2
 var auto_orbit := false
 var touch_orbit := false
 var cam: Camera3D
@@ -65,7 +65,7 @@ func _ready() -> void:
 	env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.008, 0.01, 0.028)
-	env.glow_enabled = true; env.glow_intensity = 0.7; env.glow_bloom = 0.06; env.glow_hdr_threshold = 1.0
+	env.glow_enabled = true; env.glow_intensity = 0.55; env.glow_bloom = 0.04; env.glow_hdr_threshold = 1.05
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	cam.environment = env
 	eye_root = Node3D.new(); add_child(eye_root)
@@ -129,11 +129,13 @@ func build() -> void:
 	E.append([tr["e"], Color(0.45, 1.0, 0.45, 0.8)]); T.append([tr["t"], Color(0.4, 1.0, 0.4, 0.035)]); C.append([tr["c"], Color(0.3, 0.8, 0.35, 0.6)])
 	var cl: Dictionary = Realm4DGeo.clifford(Vector4(-8, 3.4, -6, 0), 1.7, 16 if lite else 24)
 	E.append([cl["e"], Color(1.0, 0.75, 0.3, 0.75)]); T.append([cl["t"], Color(1.0, 0.7, 0.25, 0.05)])
-	var hs: Dictionary = Realm4DGeo.poly("600cell", Vector4.ONE * 2.3, Vector4(0, 3.6, -20, 0), false)
-	E.append([hs["e"], Color(0.45, 0.6, 1.0, 0.7)]); T.append([hs["t"], Color(0.4, 0.55, 1.0, 0.015 if not lite else 0.0)])
 	var hs2: Dictionary = Realm4DGeo.poly("24cell", Vector4.ONE * 1.1, Vector4(-12, 2.2, -15, 2.5))
 	E.append([hs2["e"], Color(0.6, 0.85, 1.0, 0.8)]); T.append([hs2["t"], Color(0.5, 0.8, 1.0, 0.03)]); C.append([hs2["c"], Color(0.4, 0.6, 0.95, 0.35)])
 	_add_group(E, T, C)
+	# a hypersphere (3-sphere) approximated by the 600-cell's 120 vertices on it; dense, so dimmer
+	var hs: Dictionary = Realm4DGeo.poly("600cell", Vector4.ONE * 2.3, Vector4(0, 3.6, -20, 0), false)
+	for m in _add_group([[hs["e"], Color(0.45, 0.65, 1.0, 0.8)]], [[hs["t"], Color(0.4, 0.55, 1.0, 0.0)]], []):
+		m.set_shader_parameter("energy", 0.45)
 	# the sealed 3D box: six thin walls that only exist for |w| < BOX_T
 	var bx := Realm4DGeo.empty()
 	for ax in 3:
@@ -141,7 +143,7 @@ func build() -> void:
 			var c := box_c; var h := Vector4(BOX_H, BOX_H, BOX_H, BOX_T)
 			c[ax] += sg * BOX_H; h[ax] = BOX_WALL
 			Realm4DGeo.merge(bx, Realm4DGeo.box(c, h))
-	_add_group([[bx["e"], Color(1.0, 0.75, 0.35, 0.9)]], [[bx["t"], Color(1.0, 0.65, 0.25, 0.04)]], [[bx["c"], Color(0.85, 0.55, 0.22, 1.0)]], true)
+	_add_group([[bx["e"], Color(1.0, 0.7, 0.3, 0.4)]], [[bx["t"], Color(1.0, 0.65, 0.25, 0.012)]], [[bx["c"], Color(0.85, 0.55, 0.22, 1.0)]], true)
 	# --- the six regular 4-polytopes, slowly rotating in double rotations
 	var defs := [["5cell", Vector4(-9, 3, -25, -2), Color(1.0, 0.45, 0.3)], ["tesseract", Vector4(-5.5, 3, -28, 2), Color(0.35, 0.9, 1.0)],
 		["16cell", Vector4(-2, 3, -30, -3), Color(1.0, 0.85, 0.3)], ["24cell", Vector4(2, 3, -30, 3), Color(0.55, 1.0, 0.5)],
@@ -151,16 +153,18 @@ func build() -> void:
 		var big: bool = d[0] == "600cell" or d[0] == "120cell"
 		var g: Dictionary = Realm4DGeo.poly(d[0], Vector4.ONE * 1.5, Vector4.ZERO, not big)
 		var col: Color = d[2]
-		var ms := _add_group([[g["e"], Color(col, 0.9)]], [[g["t"], Color(col, 0.0 if (big and lite) else 0.03)]], [[g["c"], Color(col * 0.8, 0.5)]])
+		var ms := _add_group([[g["e"], Color(col, 0.9)]], [[g["t"], Color(col, 0.0 if big else 0.03)]], [[g["c"], Color(col * 0.8, 0.5)]])
+		if big:
+			for m in ms: m.set_shader_parameter("energy", 0.5)
 		dyn.append({"mats": ms, "pos": d[1], "rot": Projection.IDENTITY, "spin": [[i % 6, 0.23 + 0.04 * i], [5 - (i % 6), 0.17]]})
 	# --- four w-crystals (small 16-cells) to collect
 	var cps := [Vector4(-4, 1.5, 0, 3.0), box_c, Vector4(0, 2.0, -10, 2.3), Vector4(0, 1.6, 8, 8.0)]
 	var got: Array = _got()
 	for i in cps.size():
 		var g: Dictionary = Realm4DGeo.poly("16cell", Vector4.ONE * 0.38)
-		var col := Color(0.6, 1.0, 1.0)
-		var ms := _add_group([[g["e"], Color(col, 1.0)]], [[g["t"], Color(col, 0.12)]], [[g["c"], Color(0.5, 1.0, 1.0, 0.85)]])
-		for m in ms: m.set_shader_parameter("energy", 1.7)
+		var col := Color(0.25, 1.0, 0.85)
+		var ms := _add_group([[g["e"], Color(col, 1.0)]], [[g["t"], Color(col, 0.12)]], [[g["c"], Color(0.3, 1.0, 0.85, 0.85)]])
+		for m in ms: m.set_shader_parameter("energy", 1.5)
 		var c := {"pos": cps[i], "mats": ms, "got": got.has(i), "rot": Projection.IDENTITY}
 		crystals.append(c)
 		dyn.append({"mats": ms, "pos": cps[i], "rot": Projection.IDENTITY, "spin": [[2, 0.9], [3, 0.7]], "crystal": i})
@@ -215,9 +219,27 @@ func enter() -> void:
 	_music_prev = G.player_w
 	_load_progress()
 	_apply_view()
-	if not G.lessons_done.has("realm"):
+	_test_args()
+	if not G.lessons_done.has("realm") and not OS.get_cmdline_user_args().has("--rquiet"):
 		director.play("realm")
 	print("[realm] enter pos=%s" % pos)
+
+## test hooks: --rpos=x,y,z,w --rturn=zw:0.8,yaw:0.3 --rpitch=deg --rview=1 --rorbit=yaw,pitch,dist --rnofog
+func _test_args() -> void:
+	for a in OS.get_cmdline_user_args():
+		var kv := a.trim_prefix("--").split("=")
+		if kv.size() < 2 and kv[0] != "rnofog": continue
+		match kv[0]:
+			"rpos":
+				var c := kv[1].split(","); pos = Vector4(float(c[0]), float(c[1]), float(c[2]), float(c[3]))
+			"rturn":
+				for t in kv[1].split(","):
+					var pa := t.split(":"); turn(pa[0], float(pa[1]))
+			"rpitch": pitch = deg_to_rad(float(kv[1]))
+			"rview": view = int(kv[1]); _apply_view()
+			"rorbit":
+				var c := kv[1].split(","); orbit_yaw = float(c[0]); orbit_pitch = float(c[1]); orbit_dist = float(c[2])
+			"rnofog": fog = false
 
 func leave() -> void:
 	active = false
@@ -370,7 +392,7 @@ func _load_progress() -> void:
 	for i in crystals.size():
 		crystals[i]["got"] = got.has(i)
 		for m in crystals[i]["mats"]: m.set_shader_parameter("alpha_mul", 0.0 if crystals[i]["got"] else 1.0)
-		for m in crystals[i]["mats"]: m.set_shader_parameter("energy", 0.0 if crystals[i]["got"] else 1.7)
+		for m in crystals[i]["mats"]: m.set_shader_parameter("energy", 0.0 if crystals[i]["got"] else 1.5)
 	room_seen = {}
 	for k in G.settings.get("realm_room_cells", []): room_seen[int(k)] = true
 
@@ -432,9 +454,9 @@ func _cell_name(i: int) -> String:
 	return ("−+"[i % 2]) + "xyzw"[i / 2]
 
 func objective() -> String:
-	var bx := "✓" if bool(G.settings.get("realm_box", false)) else "·"
-	return G.T("4D SPACE · w-crystals %d/4 · look into the sealed box from w %s · tesseract room cells %d/8",
-		"4D ПРОСТРАНСТВО · w-кристали %d/4 · погледни в затворената кутия от w %s · клетки на тесеракта %d/8") % [n_crystals(), bx, room_seen.size()]
+	var bx := "✓" if bool(G.settings.get("realm_box", false)) else "0/1"
+	return G.T("4D SPACE · w-crystals %d/4 · see into the sealed box from w: %s · tesseract-room cells %d/8",
+		"4D ПРОСТРАНСТВО · w-кристали %d/4 · погледни в затворената кутия от w: %s · клетки на стаята-тесеракт %d/8") % [n_crystals(), bx, room_seen.size()]
 
 func hints() -> String:
 	if G.touch_active():

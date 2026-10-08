@@ -14,7 +14,7 @@ uniform float retina_half = 1.0;
 uniform float near_f = 0.12;
 uniform float fog_dist = 16.0;
 uniform float fog_on = 1.0;
-uniform float width = 0.0035;
+uniform float width = 0.0016;
 uniform float energy = 1.0;
 uniform float alpha_mul = 1.0;
 

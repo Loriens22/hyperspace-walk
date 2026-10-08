@@ -31,7 +31,8 @@ void vertex() {
 		vret = p;
 		vec3 va = (MODELVIEW_MATRIX * vec4(p, 1.0)).xyz;
 		vec3 vo = (MODELVIEW_MATRIX * vec4(o, 1.0)).xyz;
-		VERTEX = ribbon(va, vo, UV.y, width);
+		float wpx = width * length(MODELVIEW_MATRIX[0].xyz);
+		VERTEX = ribbon(va, vo, UV.y, wpx);
 		float d = length(cs);
 		vcol = depth_tint(col, d) * depth_bright(d) * energy * COLOR.a * vkeep;
 	} else if (kind == 1) {
@@ -59,7 +60,8 @@ void vertex() {
 		vec4 cs = UV.x < 0.5 ? P[0] : P[1]; vec4 co = UV.x < 0.5 ? P[1] : P[0];
 		vec3 va = vec3(cs.x, cs.y, -cs.z) * vkeep;
 		vec3 vo = vec3(co.x, co.y, -co.z) * vkeep;
-		VERTEX = ribbon(va, vo, UV.y, width) * vkeep;
+		float wpx = width * length(MODELVIEW_MATRIX[0].xyz);
+		VERTEX = ribbon(va, vo, UV.y, wpx) * vkeep;
 		float d = length(cs.xyz);
 		vcol = col * depth_bright(d) * energy * COLOR.a * vkeep;
 		vret = vec3(0.0);
