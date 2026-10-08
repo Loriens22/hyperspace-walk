@@ -66,6 +66,7 @@ func _ready() -> void:
 	title_cam.current = true
 	G.playing = false
 	G.settings_changed.connect(_apply_gfx)
+	G.touch_changed.connect(_apply_gfx)
 	_apply_gfx()
 	fps_label = Label.new(); fps_label.position = Vector2(8, 700); fps_label.add_theme_font_size_override("font_size", 14)
 	fps_label.modulate = Color(0.6, 1, 0.7); ui.add_child(fps_label)
@@ -94,6 +95,14 @@ func _apply_gfx() -> void:
 		if c is DirectionalLight3D and c.light_energy > 1.0: c.shadow_enabled = not low
 	for i in world.bubbles.size():
 		world.bubbles[i].visible = (not low) or i % 2 == 0
+	var mobile: bool = low and (G.touch_platform or G.touch_active())
+	if mobile:
+		# phones: render 3D at ~540 physical rows, fewer particles, drop the busiest background polytope
+		var wh: float = maxf(float(DisplayServer.window_get_size().y), 1.0)
+		vp.scaling_3d_scale = clampf(540.0 / wh, 0.35, 0.7)
+	if world.giants.size() > 2: world.giants[2].visible = not mobile
+	if aether and aether._trail: aether._trail.amount = 20 if mobile else 48
+	print("[gfx] low=%s mobile=%s scale3d=%.2f" % [low, mobile, vp.scaling_3d_scale])
 
 func _add_station(id: String, script, pos: Vector3) -> void:
 	if script == null: return
@@ -196,7 +205,8 @@ func _on_lesson_finished(id: String) -> void:
 # ------------------------------------------------------------------ input
 func _unhandled_input(e: InputEvent) -> void:
 	if not G.playing: return
-	if e is InputEventMouseButton and e.pressed and not G.paused and not ui.any_panel_open():
+	if e is InputEventMouseButton and e.pressed and not G.paused and not ui.any_panel_open() \
+			and not G.touch_active() and e.device != InputEvent.DEVICE_ID_EMULATION:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if e.is_action_pressed("menu"):
 		if ui.log_panel.visible or ui.settings_panel.visible:
@@ -220,9 +230,9 @@ func _process(delta: float) -> void:
 	if fps_label:
 		fps_label.visible = bool(G.settings.get("fps", false))
 		if fps_label.visible: fps_label.text = "%d fps" % Engine.get_frames_per_second()
-	if _fps_t > 10.0:
+	if _fps_t > 5.0:
 		_fps_t = 0.0
-		print("[fps] focus=%s %d proc=%.1fms phys=%.1fms playing=%s paused=%s lesson=%s w=%.2f pos=%s" % [manip.focused.get_path() if manip.focused else "-", Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, G.playing, G.paused, director.current, G.player_w, player.global_position.snapped(Vector3.ONE * 0.1)])
+		print("[fps] focus=%s %d proc=%.1fms phys=%.1fms playing=%s paused=%s lesson=%s w=%.2f yaw=%.2f touch=%s pos=%s" % [manip.focused.get_path() if manip.focused else "-", Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, G.playing, G.paused, director.current, G.player_w, player.yaw, G.touch_active(), player.global_position.snapped(Vector3.ONE * 0.1)])
 	if G.paused:
 		if G.playing and not ui.log_panel.visible and not ui.settings_panel.visible and not ui.pause_menu.visible:
 			ui.show_pause(true)

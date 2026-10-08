@@ -4,6 +4,7 @@ extends Node
 signal changed
 signal lang_changed
 signal settings_changed
+signal touch_changed
 signal toast(text: String)
 
 const SAVE_PATH := "user://hyperspace_walk_save.json"
@@ -20,7 +21,8 @@ var lang := "en"
 var playing := false       # in-game (not title)
 var paused := false
 var settings := {"sens": 0.25, "subs": 22, "reduced_motion": false, "colorblind": false, "subtitles": true,
-	"music": 0.7, "voice": 1.0, "sfx": 0.8, "hints": true, "low_gfx": false, "fps": false}
+	"music": 0.7, "voice": 1.0, "sfx": 0.8, "hints": true, "low_gfx": false, "fps": false,
+	"touch_mode": 0, "touch_sens": 1.0, "perf_auto_done": false}
 
 var content := {}
 var lessons := {}
@@ -40,6 +42,37 @@ func _ready() -> void:
 	_setup_inputs()
 	_setup_audio()
 	load_settings_only()
+	touch_platform = _detect_touch_platform()
+	print("[touch] platform=%s touchscreen=%s" % [touch_platform, DisplayServer.is_touchscreen_available()])
+	if touch_platform and not bool(settings.get("perf_auto_done", false)):
+		settings["low_gfx"] = true; settings["perf_auto_done"] = true
+		save_settings_only()
+
+# ---------------------------------------------------------------- touch detection
+var touch_platform := false   # phone/tablet browser (or coarse-pointer touchscreen)
+var touch_seen := false       # a real touch happened this session
+
+func _detect_touch_platform() -> bool:
+	if OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("android") or OS.has_feature("ios"):
+		return true
+	if OS.has_feature("web") and DisplayServer.is_touchscreen_available():
+		var coarse = JavaScriptBridge.eval("window.matchMedia('(pointer: coarse)').matches", true)
+		return bool(coarse)
+	return false
+
+func touch_active() -> bool:
+	var m: int = int(settings.get("touch_mode", 0))
+	if m == 1: return true
+	if m == 2: return false
+	return touch_platform or touch_seen
+
+func _input(e: InputEvent) -> void:
+	if e is InputEventScreenTouch and e.pressed and not touch_seen:
+		touch_seen = true
+		touch_changed.emit()
+	elif e is InputEventKey and e.pressed and not e.echo and touch_seen and not touch_platform:
+		touch_seen = false          # desktop with a touchscreen: back to keyboard/mouse
+		touch_changed.emit()
 
 # ---------------------------------------------------------------- input map
 func _key(action: String, keys: Array) -> void:
@@ -90,6 +123,7 @@ func palette() -> Array:
 
 func set_setting(k: String, v) -> void:
 	settings[k] = v
+	if k == "touch_mode": touch_changed.emit()
 	_apply_volumes()
 	settings_changed.emit()
 	save_settings_only()

@@ -43,6 +43,20 @@ var log_text: RichTextLabel
 var _toast_t := 0.0
 var _log_ids: Array = []
 var objective_text := ""
+var touch: TouchUI
+var w_panel: PanelContainer
+var obj_panel: PanelContainer
+var title_box: VBoxContainer
+var pause_box: PanelContainer
+var settings_box: PanelContainer
+var settings_scroll: ScrollContainer
+var settings_v: Container
+var log_margin: MarginContainer
+var rotate_hint: PanelContainer
+var _touch_on := false
+var _rotate_t := 0.0
+var _was_portrait := false
+var _fs_shown := -1
 
 const CYAN := Color(0.35, 0.92, 1.0)
 const MAG := Color(1.0, 0.4, 0.85)
@@ -55,6 +69,8 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 	_build_hud()
+	touch = TouchUI.new(); touch.ui = self; touch.director = director; touch.manip = manip
+	root.add_child(touch)
 	_build_title()
 	_build_pause()
 	_build_settings()
@@ -62,8 +78,12 @@ func _ready() -> void:
 	G.toast.connect(show_toast)
 	G.lang_changed.connect(_relabel)
 	G.settings_changed.connect(_apply_settings)
+	_build_rotate_hint()
 	_relabel(); _apply_settings()
 	show_title()
+	get_viewport().size_changed.connect(_layout)
+	G.touch_changed.connect(_layout)
+	_layout.call_deferred()
 
 # ------------------------------------------------------------------ theme
 func _sb(bg: Color, border: Color, bw: int = 1, r: int = 8, pad: int = 12) -> StyleBoxFlat:
@@ -90,6 +110,12 @@ func _make_theme() -> Theme:
 	t.set_stylebox("panel", "ItemList", _sb(Color(0.01, 0.02, 0.05, 0.9), Color(0.3, 0.85, 1.0, 0.35)))
 	t.set_stylebox("selected", "ItemList", _sb(Color(0.08, 0.25, 0.35, 1.0), Color(0.4, 0.95, 1.0, 0.8), 1, 4, 4))
 	t.set_stylebox("selected_focus", "ItemList", _sb(Color(0.08, 0.25, 0.35, 1.0), Color(0.4, 0.95, 1.0, 0.8), 1, 4, 4))
+	var sbg := StyleBoxFlat.new(); sbg.bg_color = Color(0.3, 0.85, 1.0, 0.12); sbg.set_corner_radius_all(6)
+	sbg.content_margin_left = 7; sbg.content_margin_right = 7
+	var sgr := StyleBoxFlat.new(); sgr.bg_color = Color(0.35, 0.92, 1.0, 0.55); sgr.set_corner_radius_all(6)
+	var sgh := sgr.duplicate(); sgh.bg_color = Color(1.0, 0.5, 0.9, 0.8)
+	t.set_stylebox("scroll", "VScrollBar", sbg); t.set_stylebox("grabber", "VScrollBar", sgr)
+	t.set_stylebox("grabber_highlight", "VScrollBar", sgh); t.set_stylebox("grabber_pressed", "VScrollBar", sgh)
 	t.set_stylebox("normal", "RichTextLabel", _sb(Color(0.01, 0.02, 0.05, 0.9), Color(0.3, 0.85, 1.0, 0.35), 1, 6, 16))
 	return t
 
@@ -112,7 +138,7 @@ func _build_hud() -> void:
 	var op := PanelContainer.new(); op.position = Vector2(18, 16); op.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	objective = _label("", 18, Color(1.0, 0.92, 0.6)); objective.custom_minimum_size = Vector2(420, 0)
 	objective.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	op.add_child(objective); hud.add_child(op)
+	op.add_child(objective); hud.add_child(op); obj_panel = op
 	op.name = "ObjPanel"
 	# w gauge (left)
 	var wp := PanelContainer.new(); wp.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -137,7 +163,7 @@ func _build_hud() -> void:
 	w_lock = _label("", 12, Color(1, 0.6, 0.5)); w_lock.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; w_lock.custom_minimum_size = Vector2(100, 0)
 	w_lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	wv.add_child(w_lock)
-	wp.add_child(wv); hud.add_child(wp)
+	wp.add_child(wv); hud.add_child(wp); w_panel = wp
 	# focus panel (top-right)
 	focus_panel = PanelContainer.new(); focus_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	focus_panel.custom_minimum_size = Vector2(410, 0); _place(focus_panel, Control.PRESET_TOP_RIGHT, Vector2(-16, 16), Control.GROW_DIRECTION_BEGIN)
@@ -198,7 +224,7 @@ func _build_title() -> void:
 	var gt := GradientTexture2D.new(); gt.gradient = g; gt.fill_from = Vector2(0.0, 0.5); gt.fill_to = Vector2(0.75, 0.5)
 	grad.texture = gt; grad.mouse_filter = Control.MOUSE_FILTER_IGNORE; grad.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	title.add_child(grad)
-	var v := VBoxContainer.new(); v.position = Vector2(80, 80); v.add_theme_constant_override("separation", 12)
+	var v := VBoxContainer.new(); v.position = Vector2(80, 80); v.add_theme_constant_override("separation", 12); title_box = v
 	var t1 := _label("HYPERSPACE", 76, CYAN); t1.add_theme_font_override("font", load("res://fonts/DejaVuSans-Bold.ttf"))
 	var t2 := _label("WALK", 76, MAG); t2.add_theme_font_override("font", load("res://fonts/DejaVuSans-Bold.ttf"))
 	v.add_child(t1); v.add_child(t2)
@@ -219,7 +245,7 @@ func _build_pause() -> void:
 	pause_menu = Control.new(); pause_menu.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var dim := ColorRect.new(); dim.color = Color(0, 0.01, 0.03, 0.6); dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pause_menu.add_child(dim)
-	var p := PanelContainer.new(); _place(p, Control.PRESET_CENTER, Vector2.ZERO, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	var p := PanelContainer.new(); _place(p, Control.PRESET_CENTER, Vector2.ZERO, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH); pause_box = p
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 10)
 	var h := _label("", 34, CYAN); h.name = "H"; h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(h)
 	for pair in [["Resume", func(): resume.emit()], ["Settings", func(): open_settings()], ["Log", func(): open_log()],
@@ -231,33 +257,52 @@ func _build_pause() -> void:
 
 # ------------------------------------------------------------------ settings
 var _set_rows := {}
+var settings_cols: Array[VBoxContainer] = []
 func _build_settings() -> void:
 	settings_panel = Control.new(); settings_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var dim := ColorRect.new(); dim.color = Color(0, 0.01, 0.03, 0.7); dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	settings_panel.add_child(dim)
 	var p := PanelContainer.new(); p.custom_minimum_size = Vector2(600, 0); _place(p, Control.PRESET_CENTER, Vector2.ZERO, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
-	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 10)
-	var h := _label("", 30, CYAN); h.name = "H"; v.add_child(h)
-	_slider_row(v, "sens", 0.05, 0.8, 0.01)
-	_slider_row(v, "subs", 16, 34, 1)
-	_slider_row(v, "music", 0, 1, 0.05)
-	_slider_row(v, "voice", 0, 1, 0.05)
-	_slider_row(v, "sfx", 0, 1, 0.05)
+	settings_box = p
+	var pv := VBoxContainer.new(); pv.add_theme_constant_override("separation", 8)
+	var top := HBoxContainer.new()
+	var h := _label("", 30, CYAN); h.name = "H"; h.size_flags_horizontal = Control.SIZE_EXPAND_FILL; top.add_child(h)
+	var close := _btn("", func(): settings_panel.visible = false); close.name = "Close"; close.custom_minimum_size = Vector2(160, 44); top.add_child(close)
+	pv.add_child(top)
+	# two columns that wrap into one on narrow (portrait) screens
+	var flow := HFlowContainer.new(); flow.add_theme_constant_override("h_separation", 24); flow.add_theme_constant_override("v_separation", 10)
+	flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL; settings_v = flow
+	var c1 := VBoxContainer.new(); c1.add_theme_constant_override("separation", 10)
+	var c2 := VBoxContainer.new(); c2.add_theme_constant_override("separation", 8)
+	settings_cols = [c1, c2]
+	_slider_row(c1, "sens", 0.05, 0.8, 0.01)
+	_slider_row(c1, "touch_sens", 0.3, 3.0, 0.05)
+	_slider_row(c1, "subs", 16, 34, 1)
+	_slider_row(c1, "music", 0, 1, 0.05)
+	_slider_row(c1, "voice", 0, 1, 0.05)
+	_slider_row(c1, "sfx", 0, 1, 0.05)
+	var tb := _btn("", func():
+		G.set_setting("touch_mode", (int(G.settings.get("touch_mode", 0)) + 1) % 3); _relabel())
+	tb.name = "TouchMode"; c1.add_child(tb)
+	var lb := _btn("", func(): G.set_lang("bg" if G.lang == "en" else "en")); lb.name = "Lang"; c1.add_child(lb)
 	for k in ["reduced_motion", "colorblind", "subtitles", "hints", "low_gfx", "fps"]:
 		var cb := CheckBox.new(); cb.button_pressed = bool(G.settings.get(k, false))
 		cb.toggled.connect(func(on): G.set_setting(k, on))
-		v.add_child(cb); _set_rows[k] = cb
-	var lb := _btn("", func(): G.set_lang("bg" if G.lang == "en" else "en")); lb.name = "Lang"; v.add_child(lb)
-	var close := _btn("", func(): settings_panel.visible = false); close.name = "Close"; v.add_child(close)
-	p.add_child(v); settings_panel.add_child(p)
+		c2.add_child(cb); _set_rows[k] = cb
+	flow.add_child(c1); flow.add_child(c2)
+	settings_scroll = ScrollContainer.new(); settings_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	settings_scroll.custom_minimum_size = Vector2(580, 600)
+	settings_scroll.add_child(flow)
+	pv.add_child(settings_scroll)
+	p.add_child(pv); settings_panel.add_child(p)
 	settings_panel.visible = false
 	root.add_child(settings_panel)
 
 func _slider_row(v: VBoxContainer, k: String, mn: float, mx: float, st: float) -> void:
 	var h := HBoxContainer.new()
-	var l := _label("", 17); l.custom_minimum_size = Vector2(250, 0); h.add_child(l)
+	var l := _label("", 17); l.custom_minimum_size = Vector2(190, 0); h.add_child(l)
 	var s := HSlider.new(); s.min_value = mn; s.max_value = mx; s.step = st; s.value = float(G.settings[k])
-	s.custom_minimum_size = Vector2(300, 24); s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	s.custom_minimum_size = Vector2(200, 30); s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	s.value_changed.connect(func(val): G.set_setting(k, val))
 	h.add_child(s); v.add_child(h)
 	_set_rows[k] = l
@@ -267,7 +312,7 @@ func _build_log() -> void:
 	log_panel = Control.new(); log_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var dim := ColorRect.new(); dim.color = Color(0, 0.01, 0.03, 0.8); dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	log_panel.add_child(dim)
-	var m := MarginContainer.new(); m.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var m := MarginContainer.new(); m.set_anchors_preset(Control.PRESET_FULL_RECT); log_margin = m
 	for side in ["left", "right", "top", "bottom"]: m.add_theme_constant_override("margin_" + side, 40)
 	var v := VBoxContainer.new()
 	var top := HBoxContainer.new()
@@ -282,6 +327,7 @@ func _build_log() -> void:
 	log_text.add_theme_font_size_override("normal_font_size", 18)
 	log_text.add_theme_font_override("bold_font", load("res://fonts/DejaVuSans-Bold.ttf"))
 	log_text.meta_clicked.connect(func(meta): OS.shell_open(str(meta)))
+	log_text.gui_input.connect(_log_drag)
 	hb.add_child(log_text)
 	v.add_child(hb)
 	m.add_child(v); log_panel.add_child(m)
@@ -343,7 +389,15 @@ X — slice at your w / projection     C — perspective / orthographic / stereo
 P — pause Aether     T — replay line     N / Enter — next line
 L — English / Български     J or Tab — Research Log     H — hide hints     Esc — menu
 
-Tip: in a browser, Ctrl+W closes the tab, so use Z to crouch.""",
+Tip: in a browser, Ctrl+W closes the tab, so use Z to crouch.
+
+[b]Touch (phones / tablets)[/b]
+
+Left thumb — floating joystick (push to the rim to run)     Right side — drag to look
+JUMP · CROUCH (toggle) · W+ / W− (hold; after Station I)
+Plane · −15° · +15° · VIEW · SLICE (near a 4D object; after Station III)
+Top row: ≡ menu · LOG · 1P/3P camera · Aether: II pause · ↺ replay · » next
+Settings: Touch controls Auto / On / Off · Touch look sensitivity""",
 """[b]Управление[/b]
 
 WASD / ↑↓ — ходене     Мишка (клик за захващане) или ←→ — оглеждане
@@ -356,7 +410,15 @@ X — сечение при твоето w / проекция     C — перс
 P — пауза на Етер     T — повтори реплика     N / Enter — следваща
 L — English / Български     J или Tab — Дневник     H — скрий подсказките     Esc — меню
 
-Съвет: в браузър Ctrl+W затваря раздела, затова клякай със Z.""")
+Съвет: в браузър Ctrl+W затваря раздела, затова клякай със Z.
+
+[b]Сензорен екран (телефон / таблет)[/b]
+
+Ляв палец — плаващ джойстик (до ръба = тичане)     Дясна част — плъзни за поглед
+СКОК · КЛЯК (превключва) · W+ / W− (задръж; след Станция I)
+Равнина · −15° · +15° · ИЗГЛ · СЕЧ (до 4D обект; след Станция III)
+Горе: ≡ меню · ДНЕВ · 1P/3P камера · Етер: II пауза · ↺ повтори · » следваща
+Настройки: Сензорно управление Авто / Вкл. / Изкл. · Чувствителност при докосване""")
 
 # ------------------------------------------------------------------ state changes
 func show_title() -> void:
@@ -368,18 +430,43 @@ func show_game() -> void:
 
 func show_pause(on: bool) -> void:
 	pause_menu.visible = on
+	if on: _print_menus.call_deferred()
 	if not on:
 		settings_panel.visible = false; log_panel.visible = false
 
 func open_settings() -> void:
 	settings_panel.visible = true
 	settings_panel.move_to_front()
+	_layout()
+	_center_settings.call_deferred()
+	_print_menus.call_deferred()
+
+func _center_settings() -> void:
+	var V := get_viewport().get_visible_rect().size
+	var sz := settings_box.get_combined_minimum_size()
+	settings_box.size = sz
+	settings_box.position = ((V - sz) / 2.0).max(Vector2(4, 4))
 
 func any_panel_open() -> bool:
 	return settings_panel.visible or log_panel.visible or pause_menu.visible or title.visible
 
 func show_toast(t: String) -> void:
-	toast_label.text = t; _toast_t = 4.5
+	toast_label.text = touchify(t); _toast_t = 4.5
+
+const TOUCH_SUBS_EN := [["Use E / Q.", "Hold W+ / W−."], ["(1–6, R/F)", "(plane button, ±15°)"],
+	["1–6 choose plane, R/F turn", "plane button, then ±15°"], ["E = ana (+w)   Q = kata (−w)", "W+ = ana (+w)   W− = kata (−w)"],
+	["try C and X on the polytopes · J = Research Log", "try VIEW and SLICE near the polytopes · LOG = Research Log"],
+	["(P to resume)", "(tap ▶ to resume)"]]
+const TOUCH_SUBS_BG := [["Ползвай E / Q.", "Задръж W+ / W−."], ["(1–6, R/F)", "(бутон равнина, ±15°)"],
+	["1–6 равнина, R/F завъртане", "бутон равнина, после ±15°"], ["E = ана (+w)   Q = ката (−w)", "W+ = ана (+w)   W− = ката (−w)"],
+	["пробвай C и X върху политопите · J = дневник", "пробвай ИЗГЛ и СЕЧ до политопите · ДНЕВ = дневник"],
+	["(P за продължение)", "(докосни ▶ за продължение)"]]
+
+## On touch devices, swap keyboard references in objectives/toasts for the on-screen button names.
+func touchify(t: String) -> String:
+	if not _touch_on: return t
+	for pr in (TOUCH_SUBS_BG if G.lang == "bg" else TOUCH_SUBS_EN): t = t.replace(pr[0], pr[1])
+	return t
 
 func set_line(lesson_id: String, ln: Dictionary) -> void:
 	sub_panel.visible = bool(G.settings["subtitles"])
@@ -389,6 +476,10 @@ func set_line(lesson_id: String, ln: Dictionary) -> void:
 	var r := []
 	for k in ln["refs"]: r.append(G.refs[k]["short"])
 	sub_refs.text = (G.T("Sources: ", "Източници: ") + " · ".join(r)) if not r.is_empty() else ""
+	var en_txt: String = ln.get("en", "")
+	if _touch_on and (en_txt.contains("Press ") or en_txt.contains("press ") or en_txt.contains(" key")):
+		sub_refs.text = G.T("Touch: E = W+ · Q = W− · 1–6 = plane button · R/F = ±15° · C = VIEW · X = SLICE · J = LOG",
+			"Сензорно: E = W+ · Q = W− · 1–6 = бутон равнина · R/F = ±15° · C = ИЗГЛ · X = СЕЧ · J = ДНЕВ") + ("\n" + sub_refs.text if sub_refs.text != "" else "")
 	var eq: String = ln.get("eq", "")
 	if eq != "":
 		eq_tex.texture = load("res://eq/%s.png" % eq)
@@ -414,16 +505,24 @@ func _relabel() -> void:
 		(pause_menu.find_child(k, true, false) as Button).text = G.T(names[k][0], names[k][1])
 	(settings_panel.find_child("H", true, false) as Label).text = G.T("Settings", "Настройки")
 	var sl := {"sens": ["Mouse sensitivity", "Чувствителност на мишката"], "subs": ["Subtitle size", "Размер на субтитрите"],
-		"music": ["Music volume", "Музика"], "voice": ["Voice volume", "Глас"], "sfx": ["Effects volume", "Ефекти"]}
+		"music": ["Music volume", "Музика"], "voice": ["Voice volume", "Глас"], "sfx": ["Effects volume", "Ефекти"],
+		"touch_sens": ["Touch look sensitivity", "Поглед при докосване"]}
 	for k in sl: (_set_rows[k] as Label).text = G.T(sl[k][0], sl[k][1])
-	var cl := {"reduced_motion": ["Reduced motion (slower 4D rotations)", "Намалено движение (по-бавни 4D въртения)"],
-		"colorblind": ["Colour-blind friendly palette (blue/orange)", "Палитра за далтонисти (синьо/оранжево)"],
+	var cl := {"reduced_motion": ["Reduced motion (slower 4D turns)", "Намалено движение"],
+		"colorblind": ["Colour-blind palette (blue/orange)", "Палитра за далтонисти"],
 		"subtitles": ["Subtitles", "Субтитри"], "hints": ["Control hints", "Подсказки за управление"],
-		"low_gfx": ["Performance mode (no shadows, lower resolution)", "Режим производителност (без сенки, по-ниска резолюция)"],
+		"low_gfx": ["Performance mode (faster, simpler)", "Режим производителност"],
 		"fps": ["Show FPS counter", "Покажи FPS"]}
 	for k in cl: (_set_rows[k] as CheckBox).text = G.T(cl[k][0], cl[k][1])
 	(settings_panel.find_child("Lang", true, false) as Button).text = "Language: English  ⇄  Български" if G.lang == "en" else "Език: Български  ⇄  English"
 	(settings_panel.find_child("Close", true, false) as Button).text = G.T("Close", "Затвори")
+	var tm: int = int(G.settings.get("touch_mode", 0))
+	var tm_en: String = ["Auto", "On", "Off"][tm]; var tm_bg: String = ["Автоматично", "Включени", "Изключени"][tm]
+	(settings_panel.find_child("TouchMode", true, false) as Button).text = G.T("Touch controls: ", "Сензорно управление: ") + G.T(tm_en, tm_bg)
+	if _touch_on:
+		(title.find_child("New", true, false) as Button).text = G.T("▶  Tap to start", "▶  Докосни, за да започнеш")
+		(title.find_child("Foot", true, false) as Label).text = G.T("Tap to start · left thumb: move · right side: look · sound starts with your first tap", "Докосни, за да започнеш · ляв палец: движение · дясно: поглед · звукът тръгва с първото докосване")
+	(rotate_hint.get_child(0) as Label).text = G.T("Rotate your device to landscape for the best view", "Завърти устройството хоризонтално за най-добър изглед")
 	(log_panel.find_child("H", true, false) as Label).text = G.T("Research Log", "Изследователски дневник")
 	(log_panel.find_child("Close", true, false) as Button).text = G.T("Close", "Затвори")
 	if director and director.current != "":
@@ -431,19 +530,28 @@ func _relabel() -> void:
 
 func _apply_settings() -> void:
 	sub_text.add_theme_font_size_override("font_size", int(G.settings["subs"]))
-	hints.visible = bool(G.settings["hints"])
+	hints.visible = bool(G.settings["hints"]) and not _touch_on
 
 func _process(delta: float) -> void:
 	if _toast_t > 0.0:
 		_toast_t -= delta
 		toast_label.modulate.a = clamp(_toast_t, 0.0, 1.0)
+	_rotate_t = maxf(_rotate_t - delta, 0.0)
+	rotate_hint.visible = _touch_on and _rotate_t > 0.0 and get_viewport().get_visible_rect().size.y > get_viewport().get_visible_rect().size.x
+	rotate_hint.modulate.a = clampf(_rotate_t, 0.0, 1.0)
+	# the HTML fullscreen button (index.html head include) only shows on the title / pause screens
+	var fs := 1 if (_touch_on and (title.visible or pause_menu.visible)) else 0
+	if fs != _fs_shown and OS.has_feature("web"):
+		_fs_shown = fs
+		JavaScriptBridge.eval("var b=document.getElementById('hw-fs');if(b)b.style.visibility='%s';" % ("visible" if fs == 1 else "hidden"))
+	if touch.player == null: touch.player = get_tree().get_first_node_in_group("player")
 	if not hud.visible: return
 	var w: float = G.player_w
 	w_label.text = "w = %+.2f" % w
 	w_marker.position.y = 110.0 - w / 3.0 * 110.0 - 3.0
 	w_marker.color = CYAN.lerp(MAG, clamp(w / 6.0 + 0.5, 0.0, 1.0))
 	w_lock.text = "" if G.w_unlocked else G.T("w locked", "w заключено")
-	objective.text = objective_text
+	objective.text = touchify(objective_text)
 	crosshair.visible = not get_tree().get_first_node_in_group("player").third_person
 	var ft := manip.focus_text() if manip else ""
 	focus_panel.visible = ft != ""
@@ -457,3 +565,124 @@ func _process(delta: float) -> void:
 	if G.rot_unlocked: h += "\n" + G.T("1–6 plane · R/F rotate 15° · 0 reset · X slice · C projection", "1–6 равнина · R/F 15° · 0 връщане · X сечение · C проекция")
 	h += "\n" + G.T("P pause Aether · T replay · N next · L language · J log · Esc menu", "P пауза · T повтори · N следваща · L език · J дневник · Esc меню")
 	hints.text = h
+
+# ------------------------------------------------------------------ touch / responsive layout
+func _build_rotate_hint() -> void:
+	rotate_hint = PanelContainer.new(); rotate_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var l := _label("", 18, Color(1, 0.92, 0.6)); l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; l.custom_minimum_size = Vector2(300, 0)
+	rotate_hint.add_child(l)
+	_place(rotate_hint, Control.PRESET_CENTER, Vector2(0, 40), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	rotate_hint.visible = false
+	root.add_child(rotate_hint)
+
+func _log_drag(e: InputEvent) -> void:
+	# drag-to-scroll for the Research Log (touch, or emulated mouse from touch)
+	var dy := 0.0
+	if e is InputEventScreenDrag: dy = e.relative.y
+	elif e is InputEventMouseMotion and (e.button_mask & MOUSE_BUTTON_MASK_LEFT) and e.device == InputEvent.DEVICE_ID_EMULATION: dy = e.relative.y
+	if dy != 0.0:
+		var sb := log_text.get_v_scroll_bar(); sb.value -= dy
+
+func _update_scale() -> bool:
+	# On phones the 1280x720 canvas would make text tiny: enlarge the UI so that one canvas unit is
+	# at least ~0.8 CSS px (window pixels / devicePixelRatio).
+	var win := Vector2(DisplayServer.window_get_size())
+	var dpr: float = maxf(DisplayServer.screen_get_scale(), 1.0)
+	var s0: float = minf(win.x / 1280.0, win.y / 720.0)
+	var f := 1.0
+	if _touch_on and s0 > 0.0:
+		f = clampf(0.8 * dpr / s0, 1.0, 4.0)
+	if absf(get_window().content_scale_factor - f) > 0.01:
+		get_window().content_scale_factor = f
+		print("[touch] scale win=%s dpr=%.2f s0=%.3f factor=%.3f" % [win, dpr, s0, f])
+		return true
+	return false
+
+var _in_layout := false
+func _layout() -> void:
+	if _in_layout: return
+	_in_layout = true
+	_touch_on = G.touch_active()
+	if _update_scale():
+		_in_layout = false
+		_layout.call_deferred()       # canvas size changed; lay out again next frame
+		return
+	var V := get_viewport().get_visible_rect().size
+	var portrait := V.y > V.x
+	var ins := touch.safe_insets() if touch else Rect2()
+	if _touch_on:
+		obj_panel.position = Vector2(12 + ins.position.x, 10 + ins.position.y)
+		objective.custom_minimum_size = Vector2(300 if not portrait else V.x * 0.55, 0)
+		objective.add_theme_font_size_override("font_size", 15)
+		w_panel.scale = Vector2.ONE * 0.55
+		_place(w_panel, Control.PRESET_TOP_LEFT, Vector2(12 + ins.position.x, 96 + ins.position.y))
+		focus_panel.custom_minimum_size = Vector2(320, 0); focus_label.custom_minimum_size = Vector2(300, 0)
+		_place(focus_panel, Control.PRESET_TOP_RIGHT, Vector2(-14 - ins.size.x, touch.focus_y() + (64 if portrait else 0)), Control.GROW_DIRECTION_BEGIN)
+		eq_panel.scale = Vector2.ONE * 0.62
+		_place(eq_panel, Control.PRESET_CENTER_TOP, Vector2(-180 if not portrait else -136, 50 + ins.position.y + (70 if portrait else 0)), Control.GROW_DIRECTION_BOTH)
+		var sw: float = (V.x - 24.0) if portrait else minf(860.0, V.x - 500.0)
+		sub_panel.custom_minimum_size = Vector2(sw, 0); sub_text.custom_minimum_size = Vector2(sw - 30, 0)
+		_place(sub_panel, Control.PRESET_CENTER_BOTTOM, Vector2(0, -(250.0 if portrait else 10.0) - ins.size.y), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
+		toast_label.custom_minimum_size = Vector2(minf(1000, V.x - 40), 0)
+	else:
+		obj_panel.position = Vector2(18, 16)
+		objective.custom_minimum_size = Vector2(420, 0)
+		objective.add_theme_font_size_override("font_size", 18)
+		w_panel.scale = Vector2.ONE
+		_place(w_panel, Control.PRESET_CENTER_LEFT, Vector2(18, -170))
+		focus_panel.custom_minimum_size = Vector2(410, 0); focus_label.custom_minimum_size = Vector2(380, 0)
+		_place(focus_panel, Control.PRESET_TOP_RIGHT, Vector2(-16, 16), Control.GROW_DIRECTION_BEGIN)
+		eq_panel.scale = Vector2.ONE
+		_place(eq_panel, Control.PRESET_CENTER_RIGHT, Vector2(-16, -190), Control.GROW_DIRECTION_BEGIN)
+		sub_panel.custom_minimum_size = Vector2(860, 0); sub_text.custom_minimum_size = Vector2(830, 0)
+		_place(sub_panel, Control.PRESET_CENTER_BOTTOM, Vector2(0, -22), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
+		toast_label.custom_minimum_size = Vector2(1000, 0)
+	# menus: shrink to fit short / narrow screens
+	var tms := title_box.get_combined_minimum_size()
+	var tsc: float = minf(1.0, minf((V.y - 60.0) / maxf(tms.y, 1.0), (V.x - 48.0) / maxf(tms.x, 1.0)))
+	title_box.scale = Vector2.ONE * tsc
+	title_box.position = Vector2((80 if tsc >= 1.0 else 24) + ins.position.x, (80 if tsc >= 1.0 else 14) + ins.position.y)
+	var foot := title.find_child("Foot", true, false) as Label
+	foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	foot.custom_minimum_size = Vector2(minf(1100.0, V.x - 48.0), 0)
+	_place(foot, Control.PRESET_BOTTOM_LEFT, Vector2(24 + ins.position.x if _touch_on else 80, -14 - ins.size.y if _touch_on else -36), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BEGIN)
+	if portrait and _touch_on and not _was_portrait: _rotate_t = 12.0
+	_was_portrait = portrait
+	var psc: float = minf(1.0, (V.y - 30.0) / 420.0)
+	pause_box.scale = Vector2.ONE * psc
+	pause_box.pivot_offset = pause_box.size / 2
+	var swid: float = minf(1000.0, V.x - 60.0)
+	var two: bool = swid >= 2.0 * 430.0 + 76.0
+	var colw: float = (swid - 76.0) / 2.0 if two else swid - 30.0
+	for c in settings_cols: c.custom_minimum_size = Vector2(colw, 0)
+	var ch: float = 0.0
+	for c in settings_cols:
+		var hh: float = c.get_combined_minimum_size().y
+		ch = maxf(ch, hh) if two else ch + hh + 10.0
+	var sh: float = minf(ch + 8.0, V.y - 130.0)
+	settings_scroll.custom_minimum_size = Vector2(swid, sh)
+	settings_box.custom_minimum_size = Vector2(swid + 24, 0)
+	settings_box.reset_size()
+	for side in ["left", "right", "top", "bottom"]:
+		log_margin.add_theme_constant_override("margin_" + side, 40 if not _touch_on else 14)
+	log_list.custom_minimum_size = Vector2(330 if V.x > 900 else 170, 0)
+	_apply_settings()
+	_relabel()
+	obj_panel.reset_size(); focus_panel.reset_size(); sub_panel.reset_size()
+	if touch: touch.layout()
+	_in_layout = false
+	_print_menus.call_deferred()
+
+func _print_menus() -> void:
+	await get_tree().process_frame
+	var V := get_viewport().get_visible_rect().size
+	var out := []
+	for pair in [["new", title.find_child("New", true, false)], ["tlog", title.find_child("Log", true, false)],
+			["tset", title.find_child("Set", true, false)], ["resume", pause_menu.find_child("Resume", true, false)],
+			["psettings", pause_menu.find_child("Settings", true, false)], ["pquit", pause_menu.find_child("Quit", true, false)],
+			["sclose", settings_panel.find_child("Close", true, false)], ["stouch", settings_panel.find_child("TouchMode", true, false)]]:
+		var c: Control = pair[1]
+		var r := c.get_global_rect()
+		out.append("%s=%s" % [pair[0], r.get_center().round()])
+	print("[touch] menus vp=%s %s" % [V.round(), " ".join(out)])

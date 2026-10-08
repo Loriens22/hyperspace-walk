@@ -37,8 +37,32 @@ Blender Cycles previews: [explorer](shots/render_explorer.png) · [Aether](shots
 | H | toggle control hints |
 | Esc | pause menu (save, load, settings) |
 
-Settings: mouse sensitivity, subtitle size, volumes, reduced motion, colour-blind palette (Okabe–Ito blue/orange),
-performance mode (no shadows, 70 % render scale), FPS counter. Progress is saved in the browser (`user://`).
+### Touch (phones and tablets)
+
+The touch overlay turns on by itself on phones/tablets (Android/iOS browsers, or any coarse-pointer touchscreen),
+and on desktop as soon as a real touch happens (a key press hides it again). **Settings → Touch controls: Auto / On / Off**
+forces it either way. Every button sends the same InputMap action as its keyboard key, so gameplay is identical.
+
+| touch control | action (keyboard equivalent) |
+|---|---|
+| title screen: **▶ Tap to start** | new expedition (all menus are plain tappable buttons; no pointer lock on touch) |
+| left thumb: floating joystick | analog walk (WASD); push to the rim to **run** (Shift) |
+| right side: drag | look around (mouse); multi-touch safe, so you can walk and look at the same time |
+| **JUMP** / **CROUCH** | jump (Space) / crouch toggle (Z) |
+| **W+** / **W−** (hold) | move ana / kata along w (E / Q), shown after Station I |
+| **plane** · **−15°** · **+15°** · **VIEW** · **SLICE** | next rotation plane (1–6) · rotate (F / R) · projection (C) · slice view (X); shown near a 4D object after Station III |
+| top row **≡** · **LOG** · **1P/3P** | pause menu (Esc) · Research Log (J) · camera (V) |
+| **II/▶** · **↺** · **»** (while Aether speaks) | pause / replay / next line (P / T / N) |
+| ⛶ (title and pause screens, where supported) | browser fullscreen, then tries to lock landscape |
+
+Layout adapts to portrait and landscape and respects safe-area insets; on small screens the UI is enlarged
+(about 0.8 CSS px per canvas unit) and menus shrink or scroll to fit. Portrait works, and you get a short hint to
+rotate to landscape. Objectives and toasts show button names in place of keys. Phones start in performance mode:
+no shadows, 3D rendered at about 540 physical rows, fewer particles, and one fewer background polytope.
+
+Settings: mouse sensitivity, touch look sensitivity, touch controls (auto/on/off), subtitle size, volumes, reduced motion,
+colour-blind palette (Okabe–Ito blue/orange), performance mode (no shadows, 70 % render scale), FPS counter.
+Progress is saved in the browser (`user://`).
 
 ## What's in the game
 
