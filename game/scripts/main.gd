@@ -356,6 +356,10 @@ func _portal_check(delta: float) -> void:
 	_portal_cool = maxf(_portal_cool - delta, 0.0)
 	var p := player.global_position
 	if _portal_cool <= 0.0 and Vector2(p.x - PORTAL_POS.x, p.z - PORTAL_POS.z).length() < 1.0 and p.y < 2.0:
+		if director.current != "" and director.is_main_lesson(director.current):
+			_portal_cool = 4.0
+			G.toast.emit(G.T("The portal opens when Aether finishes speaking (or skip the lesson)", "Порталът се отваря, когато Етер завърши (или пропусни урока)"))
+			return
 		_enter_realm(false)
 
 func _on_realm_requested() -> void:
@@ -390,11 +394,11 @@ func _enter_realm(from_title: bool) -> void:
 func _leave_realm() -> void:
 	if not G.in_realm: return
 	realm.leave()
+	for id in ["realm", "realm_box", "realm_crystal", "realm_room", "realm_done"]:
+		director.queue.erase(id)
+		if director.current == id: director.skip_lesson()
 	G.in_realm = false
 	_set_world_active(true)
-	for id in ["realm", "realm_box", "realm_crystal", "realm_room", "realm_done"]:
-		if director.current == id: director.skip_lesson()
-		director.queue.erase(id)
 	if realm_from_title:
 		G.playing = false
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

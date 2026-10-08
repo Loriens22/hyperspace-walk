@@ -359,7 +359,8 @@ func _process(delta: float) -> void:
 	if auto_orbit: orbit_yaw += delta * 0.25
 	if view == 0:
 		var o := Vector3(sin(orbit_yaw) * cos(orbit_pitch), sin(orbit_pitch), cos(orbit_yaw) * cos(orbit_pitch)) * orbit_dist
-		cam.transform = Transform3D(Basis.IDENTITY, o).looking_at(Vector3.ZERO, Vector3.UP)
+		var tgt := Vector3(0, -0.45, 0) if G.touch_active() else Vector3(0, -0.12, 0)   # lift the retina above the subtitles
+		cam.transform = Transform3D(Basis.IDENTITY, o + tgt).looking_at(tgt, Vector3.UP)
 	else:
 		cam.transform = Transform3D.IDENTITY
 	# --- uniforms
