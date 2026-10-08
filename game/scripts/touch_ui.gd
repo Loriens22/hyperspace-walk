@@ -21,6 +21,7 @@ var insets := Rect2()        # safe-area insets (left, top, right, bottom) in ca
 var font: Font
 var _active := false
 var _held := {}              # action -> true (hold buttons currently down)
+var _dbg := OS.get_cmdline_user_args().has("--tdbg")
 var _last := {}              # index -> last position (Godot web's drag .relative is unreliable with 2+ fingers)
 
 func _ready() -> void:
@@ -145,6 +146,7 @@ func _input(e: InputEvent) -> void:
 	if not _active: return
 	if e is InputEventScreenTouch:
 		var st := e as InputEventScreenTouch
+		if _dbg: print("[tdbg] touch idx=%d pressed=%s pos=%s" % [st.index, st.pressed, st.position.round()])
 		if st.pressed:
 			_last[st.index] = st.position
 			var id := _hit(st.position)
@@ -172,6 +174,7 @@ func _input(e: InputEvent) -> void:
 		if not touches.has(sd.index): return
 		var role: String = touches[sd.index]
 		var rel: Vector2 = sd.position - _last.get(sd.index, sd.position)
+		if _dbg: print("[tdbg] drag idx=%d role=%s pos=%s rel=%s" % [sd.index, role, sd.position.round(), rel.round()])
 		_last[sd.index] = sd.position
 		if role == "joy":
 			_update_joy(sd.position)

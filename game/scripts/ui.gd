@@ -620,7 +620,7 @@ func _layout() -> void:
 		focus_panel.custom_minimum_size = Vector2(320, 0); focus_label.custom_minimum_size = Vector2(300, 0)
 		_place(focus_panel, Control.PRESET_TOP_RIGHT, Vector2(-14 - ins.size.x, touch.focus_y() + (64 if portrait else 0)), Control.GROW_DIRECTION_BEGIN)
 		eq_panel.scale = Vector2.ONE * 0.62
-		_place(eq_panel, Control.PRESET_CENTER_TOP, Vector2(-180 if not portrait else -136, 50 + ins.position.y + (70 if portrait else 0)), Control.GROW_DIRECTION_BOTH)
+		_place(eq_panel, Control.PRESET_CENTER_TOP, Vector2(-24 if not portrait else -136, 50 + ins.position.y + (100 if portrait else 0)), Control.GROW_DIRECTION_BOTH)
 		var sw: float = (V.x - 24.0) if portrait else minf(860.0, V.x - 500.0)
 		sub_panel.custom_minimum_size = Vector2(sw, 0); sub_text.custom_minimum_size = Vector2(sw - 30, 0)
 		_place(sub_panel, Control.PRESET_CENTER_BOTTOM, Vector2(0, -(250.0 if portrait else 10.0) - ins.size.y), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
