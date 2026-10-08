@@ -92,7 +92,7 @@ body {
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
-<meta name="description" content="Hyperspace Walk - an educational walk through four-dimensional space."><style>body{background:#02030a}</style><script>try{if(navigator.audioSession)navigator.audioSession.type="playback";}catch(e){}</script>
+<meta name="description" content="Hyperspace Walk - an educational walk through four-dimensional space."><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#02030a"><style>html,body{background:#02030a;overscroll-behavior:none;position:fixed;inset:0;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}#canvas{touch-action:none}#hw-fs{position:fixed;top:10px;right:10px;visibility:hidden;z-index:10;display:none;font:600 18px sans-serif;line-height:1;color:#bff4ff;background:rgba(4,12,24,.5);border:1px solid rgba(90,235,255,.7);border-radius:50%;width:38px;height:38px;padding:0}</style><script>try{if(navigator.audioSession)navigator.audioSession.type="playback";}catch(e){}document.addEventListener("gesturestart",function(e){e.preventDefault();},{passive:false});document.addEventListener("touchmove",function(e){if(e.touches.length>1||e.target.id==="canvas")e.preventDefault();},{passive:false});document.addEventListener("dblclick",function(e){e.preventDefault();},{passive:false});window.addEventListener("DOMContentLoaded",function(){var d=document.documentElement,c=window.matchMedia("(pointer: coarse)").matches,can=d.requestFullscreen||d.webkitRequestFullscreen;if(!c||!can)return;var b=document.createElement("button");b.id="hw-fs";b.innerHTML='<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#bff4ff" stroke-width="2"><path d="M2 7V2h5M13 2h5v5M18 13v5h-5M7 18H2v-5"/></svg>';b.style.paddingTop="3px";b.title="Fullscreen";b.setAttribute("aria-label","Fullscreen");document.body.appendChild(b);var upd=function(){b.style.display=(document.fullscreenElement||document.webkitFullscreenElement)?"none":"block";};b.addEventListener("click",function(ev){ev.stopPropagation();var p=(d.requestFullscreen?d.requestFullscreen({navigationUI:"hide"}):d.webkitRequestFullscreen());Promise.resolve(p).then(function(){try{screen.orientation.lock("landscape").catch(function(){});}catch(e){}}).catch(function(){});var cv=document.getElementById("canvas");if(cv)cv.focus();});document.addEventListener("fullscreenchange",upd);document.addEventListener("webkitfullscreenchange",upd);upd();});</script>
 	</head>
 	<body>
 		<canvas id="canvas">
@@ -111,7 +111,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":11418472,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":11440008,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
