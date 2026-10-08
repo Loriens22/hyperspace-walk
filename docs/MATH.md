@@ -193,6 +193,117 @@ from the flat w axis the player walks along.
 
 ---
 
+## 10. The 4D realm ("Enter 4D Space": `realm4d.gd`, `realm4d_geo.gd`, `shaders/realm4d_*.gdshader`)
+
+The main game shows 4D objects inside an ordinary 3D world. The realm is the other way round: the **whole scene
+lives in ℝ⁴** and the player is a 4D observer. Nothing is pre-projected on the CPU. Every vertex carries its 4D
+coordinates (Godot `CUSTOM0..3` attributes), and the vertex shaders project or slice them every frame.
+
+### 10.1 The observer: a point and an SO(4) frame
+
+The observer has a position `p ∈ ℝ⁴` and an orthonormal frame `E = [R U F A]` (right, up, forward, *ana*), with
+`det E = +1`, so `E ∈ SO(4)`. Camera coordinates of a world point `q` are
+
+    c = (r, u, f, a) = Eᵀ (q − p)
+
+(the shader computes `(q − p) * cam_basis`, a row vector times the matrix whose columns are R, U, F, A).
+Turning is a rotation of two frame vectors inside their common plane, which keeps E orthonormal:
+
+    (X, Y) ← (X cos θ + Y sin θ,  Y cos θ − X sin θ)
+
+* mouse / drag yaw: plane (R, F); 1/2: plane (R, A) = "xw"; 3/4: (U, A) = "yw"; 5/6: (F, A) = "zw";
+* pitch is kept as a separate angle φ on top of a "horizontal" frame (R_h, U_h, F_h, A_h):
+  `F = F_h cos φ + U_h sin φ`, `U = U_h cos φ − F_h sin φ`. Mouse look then feels like an ordinary FPS camera, and the
+  three 4D turns act on the horizontal frame (yw tilts "up" itself into w);
+* after each frame the horizontal frame is re-orthonormalised (Gram–Schmidt, `P4.orthonormalize`) to remove drift;
+* movement is `p += (F·fwd + R·strafe + U·up + A·ana) v Δt`, so W+/W− (E/Q) move along *your own* ana axis.
+  With the default orientation A = e_w, which is why the HUD's w changes.
+
+The HUD's 4×4 grid is the frame E itself: rows R, U, F, A, columns world x, y, z, w (warm = +, cool = −).
+The identity matrix means "aligned with the world".
+
+### 10.2 4D perspective onto a 3D retina ("4D Eye")
+
+A 3D eye projects onto a 2D retina by dividing by depth. A 4D eye projects onto a **3D** retina in the same way:
+
+    retina = (r, u, a) · focal / f        for f > f_near (here focal = 1.1, f_near = 0.12)
+
+So every point of the 4D world in front of you lands inside a 3D volume, the cube |retina| ≤ 1. Its three axes are
+right, up and **ana**. It has no depth axis, because depth f is the quantity divided out. That cube is then drawn as a
+translucent object that you orbit with an ordinary 3D camera (right-drag, wheel, O). That second view is only there
+to inspect the retina. It is **not** another projection of the 4D world. This is the "4D eye" idea of
+Hanson & Heng [Hanson & Heng 1992], and it echoes Hinton's suggestion of learning 4D through 3D "views"
+[Hinton 1904]. Consequences you can see:
+
+* the retina holds the **inside** of every 3D object: the sealed box in the realm shows the crystal inside it
+  (§10.5), just as a 3D viewer sees the inside of a Flatlander's square [Abbott 1884];
+* an edge whose ends are both in front stays a straight segment on the retina (perspective maps lines to lines).
+  Edges crossing f = f_near are clipped in 4D before the division. Fragments outside the retina cube are discarded,
+  which gives a field of view of about ±42° in each of r, u and a.
+
+**Occlusion approximation.** A real 4D eye would see only the nearest 3-cells along each ray. Here, as in most
+4D viewers, edges are drawn additively with semi-transparent 2-faces, so everything is visible at once. Depth
+cues: brightness falls as `exp(−|c| / fog)` with the 4D distance `|c|`, the colour shifts towards violet with
+distance (G turns the fog off), and dense far objects (600-cell, 120-cell, hypersphere) get lower energy so they do
+not saturate. In the Slice view the sealed box's walls are drawn opaque (depth-written), so there they really do
+hide the crystal.
+
+### 10.3 Oriented slicing ("Slice")
+
+A 3D being in ℝ⁴ would perceive only the hyperplane through its eye that is orthogonal to its ana axis:
+
+    H = { q : (q − p) · A = 0 } = { c : a = 0 }
+
+Points of H are shown in ordinary 3D perspective at view position (r, u, −f). Because H is defined by the frame,
+turning in xw/yw/zw **tilts the slicing hyperplane**, and the world morphs, as in Marc ten Bosch's 4D Toys and
+Miegakure [ten Bosch 2020]. In the main game the slice is always the axis-aligned w = h (§4). Here it is fully
+oriented. Two exact constructions run on the GPU:
+
+* **2-faces → segments.** Each triangle (from fanning every polygonal 2-face) meets H, in general position, in a
+  segment. The segment ends lie on the two edges whose endpoints have opposite signs of `a`:
+  `x = a₀/(a₀ − a₁)` along the edge. The vertex shader receives the whole triangle (CUSTOM0..2), computes the
+  segment and expands it into a screen-facing ribbon. Taking the union over all faces gives the outlines of the
+  3D cross-section.
+* **3-cells → polygons (marching tetrahedra).** Each 3-cell is split into tetrahedra (centroid of the cell × fan of
+  each face). A tetrahedron meets H in a triangle (one vertex on one side) or a quadrilateral (two and two). In the
+  2–2 case, with i, j on the positive side and k, l on the negative side, the quad is
+  (i,k), (i,l), (j,l), (j,k) in that cyclic order. One mesh quad per tetrahedron, selected by UV.x, collapses
+  to zero area when the tetrahedron misses H. This fills the cross-sections with translucent, shaded solids.
+
+### 10.4 Objects in the realm (all genuine 4D sets)
+
+* **Ground hyperplane** y = 0, tiled by a lattice of cubes. Its grid lines run along x, z and w. Squares in the
+  xw and zw planes slice to the floor grid.
+* **Pillars** `[x±0.3] × [0, 5] × [z±0.3] × [w±0.3]`, i.e. 4D boxes standing at different w.
+* **Tesseract room** `[−3,3] × [0,4] × [−13,−7] × [−3,3]`. You can be inside it. Its boundary is 8 cubes
+  (±x, ±y, ±z, ±w), and the realm tracks which cell you are next to (largest normalised coordinate |q_k − c_k|/h_k).
+* **Sealed box**: six thin walls of a cube that exist only for |w| < 0.12 (a 3D box "drawn" in the hyperplane
+  w = 0). In 3D it is closed. Through w it is open.
+* **4D tree**: a trunk with tesseract branches forking along ±x, ±z **and ±w**.
+* **Clifford torus** `(ρ cos s, ρ cos t, ρ sin s, ρ sin t)` (axes x, y, z, w). It is flat, it lies on the 3-sphere of
+  radius ρ√2, and it is the ridge where the two solid tori bounding the duocylinder `D² × D²` meet.
+* **Hypersphere**, drawn with the 120 vertices / 720 edges of a 600-cell inscribed in it.
+* **The six regular 4-polytopes** (§6), each turning in a double rotation (two orthogonal planes at once).
+* **w-crystals**: small 16-cells. One sits at w = +3 behind a pillar, one inside the sealed box, one in the room's
+  ana half, and one 8 units straight ana of the start, in a direction that does not exist in 3D.
+
+### 10.5 Seeing into the box from w
+
+The task "see into the sealed box from w" is checked geometrically. You must be in the Eye view, with
+|F·e_w| > 0.45 (gaze tilted at least ~27° into w), and the box centre must project inside the retina:
+`max(|r|, |u|, |a|)·focal/f < 0.9`, with the box less than 13 units away. To reach the crystal inside, go ana
+(|w| > 0.12, the walls vanish), move to the box's (x, y, z), and come back kata. The walls only block motion while
+your w is inside their slab, which is the 4D version of the Flatland door (§9).
+
+### 10.6 Performance
+
+All 4D maths is per-vertex on the GPU. The CPU only builds the meshes once (≈ 0.15 s in the web build) and
+updates ~50 materials' uniforms per frame. In software rendering (SwiftShader) the realm ran about 9× faster
+than the main level. Phones use a lighter path: no translucent faces on the densest objects and a coarser
+Clifford torus.
+
+---
+
 ## References
 
 * **[Hinton 1888]** C. H. Hinton, *A New Era of Thought*, Swan Sonnenschein, London, 1888. Coins "tessaract", "ana", "kata". https://www.gutenberg.org/ebooks/60607
@@ -210,6 +321,7 @@ from the flat w axis the player walks along.
 * **[Kaluza 1921]** Th. Kaluza, "Zum Unitätsproblem der Physik", *Sitzungsber. Preuss. Akad. Wiss.* 1921:966–972. English translation: arXiv:1803.08616
 * **[Klein 1926]** O. Klein, "Quantentheorie und fünfdimensionale Relativitätstheorie", *Z. Phys.* 37:895–906, 1926. doi:10.1007/BF01397402
 * **[Candelas et al. 1985]** P. Candelas, G. T. Horowitz, A. Strominger, E. Witten, "Vacuum configurations for superstrings", *Nucl. Phys. B* 258:46–74, 1985. doi:10.1016/0550-3213(85)90602-9
+* **[ten Bosch 2020]** M. ten Bosch, "N-Dimensional Rigid Body Dynamics", *ACM Transactions on Graphics* 39(4), Article 55, 2020 (the engine of *4D Toys* / *Miegakure*). https://marctenbosch.com/ndphysics/
 * **[Wikipedia: 4D rotations]** "Rotations in 4-dimensional Euclidean space", accessed Oct 2026.
 * **[Wikipedia: Regular 4-polytope]** "Regular 4-polytope" and "600-cell", accessed Oct 2026.
 * **[Wikipedia: 4D space]** "Four-dimensional space", accessed Oct 2026.
