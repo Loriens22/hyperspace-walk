@@ -70,6 +70,19 @@ func _ready() -> void:
 	if G.gate_open:
 		_open(true)
 
+## Skip: set the lock to the real solution (45° in yw) and open the gate.
+func solve() -> void:
+	if solved: return
+	lock._pend.clear(); lock.spin = []
+	lock.rot = P4.rot_plane_idx(4, PI / 4.0) * lock.base_rot
+	lock.turns = [0, 0, 0, 0, 3, 0]
+	lock.slice_mode = true
+	G.gate_open = true
+	_open(false)
+	G.play_sfx("door", -4.0)
+	get_tree().call_group("director", "play", "lock_ok")
+	G.toast.emit(G.T("GATE UNLOCKED", "ПОРТАТА Е ОТКЛЮЧЕНА"))
+
 func _open(instant: bool) -> void:
 	solved = true
 	barrier.collision_layer = 0

@@ -9,6 +9,11 @@ signal resume
 signal quit_to_title
 signal save_requested
 signal load_requested
+signal skip_requested
+signal skip_hint
+signal skip_anyway
+signal skip_cancel
+signal realm_requested
 
 var director: Director
 var manip: Manipulator
@@ -54,6 +59,10 @@ var settings_v: Container
 var log_margin: MarginContainer
 var rotate_hint: PanelContainer
 var _touch_on := false
+var skip_btn: Button
+var skip_dialog: Control
+var skip_label: Label
+var skip_task := ""
 var _rotate_t := 0.0
 var _was_portrait := false
 var _fs_shown := -1
@@ -79,6 +88,7 @@ func _ready() -> void:
 	G.lang_changed.connect(_relabel)
 	G.settings_changed.connect(_apply_settings)
 	_build_rotate_hint()
+	_build_skip()
 	_relabel(); _apply_settings()
 	show_title()
 	get_viewport().size_changed.connect(_layout)
@@ -248,7 +258,8 @@ func _build_pause() -> void:
 	var p := PanelContainer.new(); _place(p, Control.PRESET_CENTER, Vector2.ZERO, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH); pause_box = p
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 10)
 	var h := _label("", 34, CYAN); h.name = "H"; h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(h)
-	for pair in [["Resume", func(): resume.emit()], ["Settings", func(): open_settings()], ["Log", func(): open_log()],
+	for pair in [["Resume", func(): resume.emit()], ["Skip", func(): skip_requested.emit()], ["Realm", func(): realm_requested.emit()],
+			["Settings", func(): open_settings()], ["Log", func(): open_log()],
 			["Save", func(): save_requested.emit()], ["Load", func(): load_requested.emit()], ["Quit", func(): quit_to_title.emit()]]:
 		var b := _btn("", pair[1]); b.name = pair[0]; v.add_child(b)
 	p.add_child(v); pause_menu.add_child(p)
@@ -450,7 +461,7 @@ func _center_settings() -> void:
 	settings_box.position = ((V - sz) / 2.0).max(Vector2(4, 4))
 
 func any_panel_open() -> bool:
-	return settings_panel.visible or log_panel.visible or pause_menu.visible or title.visible
+	return settings_panel.visible or log_panel.visible or pause_menu.visible or title.visible or skip_dialog.visible
 
 func show_toast(t: String) -> void:
 	toast_label.text = touchify(t); _toast_t = 4.5
@@ -501,7 +512,7 @@ func _relabel() -> void:
 	(title.find_child("Lang", true, false) as Button).text = "Language: English  ⇄  Български" if G.lang == "en" else "Език: Български  ⇄  English"
 	(title.find_child("Foot", true, false) as Label).text = G.T("Made with Blender + Godot · voice: neural TTS · Click a button to begin (enables sound)", "Създадено с Blender + Godot · глас: невронен TTS · Натисни бутон, за да започнеш (включва звука)")
 	(pause_menu.find_child("H", true, false) as Label).text = G.T("Paused", "Пауза")
-	var names := {"Resume": ["Resume", "Продължи"], "Settings": ["Settings", "Настройки"], "Log": ["Research Log", "Дневник"],
+	var names := {"Skip": ["Skip current task", "Пропусни задачата"], "Realm": ["Enter 4D Space", "Влез в 4D пространството"], "Resume": ["Resume", "Продължи"], "Settings": ["Settings", "Настройки"], "Log": ["Research Log", "Дневник"],
 		"Save": ["Save game", "Запази"], "Load": ["Load game", "Зареди"], "Quit": ["Quit to title", "Към началото"]}
 	for k in names:
 		(pause_menu.find_child(k, true, false) as Button).text = G.T(names[k][0], names[k][1])
@@ -654,7 +665,7 @@ func _layout() -> void:
 	_place(foot, Control.PRESET_BOTTOM_LEFT, Vector2(24 + ins.position.x if _touch_on else 80, -14 - ins.size.y if _touch_on else -36), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BEGIN)
 	if portrait and _touch_on and not _was_portrait: _rotate_t = 12.0
 	_was_portrait = portrait
-	var psc: float = minf(1.0, (V.y - 30.0) / 420.0)
+	var psc: float = minf(1.0, (V.y - 30.0) / 540.0)
 	pause_box.scale = Vector2.ONE * psc
 	pause_box.pivot_offset = pause_box.size / 2
 	var swid: float = minf(1000.0, V.x - 60.0)
@@ -691,3 +702,46 @@ func _print_menus() -> void:
 		var r := c.get_global_rect()
 		out.append("%s=%s" % [pair[0], r.get_center().round()])
 	print("[touch] menus vp=%s %s" % [V.round(), " ".join(out)])
+
+# ------------------------------------------------------------------ skip puzzle / task
+func _build_skip() -> void:
+	skip_btn = _btn("", func(): skip_requested.emit())
+	skip_btn.custom_minimum_size = Vector2(250, 44)
+	_place(skip_btn, Control.PRESET_CENTER_TOP, Vector2(0, 96), Control.GROW_DIRECTION_BOTH)
+	skip_btn.add_theme_color_override("font_color", Color(1, 0.9, 0.55))
+	skip_btn.visible = false; skip_btn.focus_mode = Control.FOCUS_NONE
+	hud.add_child(skip_btn)
+	skip_dialog = Control.new(); skip_dialog.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var dim := ColorRect.new(); dim.color = Color(0, 0.01, 0.03, 0.55); dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	skip_dialog.add_child(dim)
+	var p := PanelContainer.new(); _place(p, Control.PRESET_CENTER, Vector2.ZERO, Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BOTH)
+	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 10)
+	var h := _label("", 28, CYAN); h.name = "H"; h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; v.add_child(h)
+	skip_label = _label("", 17, Color(1.0, 0.92, 0.6)); skip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	skip_label.custom_minimum_size = Vector2(420, 0); skip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(skip_label)
+	for pair in [["Hint", func(): skip_hint.emit()], ["Anyway", func(): skip_anyway.emit()], ["Cancel", func(): skip_cancel.emit()]]:
+		var b := _btn("", pair[1]); b.name = pair[0]; v.add_child(b)
+	p.add_child(v); skip_dialog.add_child(p)
+	skip_dialog.visible = false
+	root.add_child(skip_dialog)
+
+## kind: "" (hidden), "lesson", "puzzle", "walk"
+func set_skip(kind: String) -> void:
+	skip_btn.visible = kind != "" and hud.visible
+	if kind == "": return
+	var key := "" if _touch_on else "  [K]"
+	match kind:
+		"lesson": skip_btn.text = G.T("Skip lesson", "Пропусни урока") + key
+		"puzzle": skip_btn.text = G.T("Skip puzzle", "Пропусни загадката") + key
+		_: skip_btn.text = G.T("Skip ahead", "Прескочи напред") + key
+
+func open_skip_dialog(task_text: String) -> void:
+	skip_label.text = touchify(task_text)
+	var k := not _touch_on
+	(skip_dialog.find_child("H", true, false) as Label).text = G.T("Stuck?", "Заседна ли?")
+	(skip_dialog.find_child("Hint", true, false) as Button).text = G.T("Ask Aether for a hint", "Подсказка от Етер") + ("  [1]" if k else "")
+	(skip_dialog.find_child("Anyway", true, false) as Button).text = G.T("Skip anyway (solve it)", "Пропусни (реши я)") + ("  [2]" if k else "")
+	(skip_dialog.find_child("Cancel", true, false) as Button).text = G.T("Cancel", "Отказ") + ("  [Esc]" if k else "")
+	skip_dialog.visible = true
+	skip_dialog.move_to_front()

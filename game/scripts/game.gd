@@ -92,7 +92,7 @@ func _setup_inputs() -> void:
 	_key("cam", [KEY_V]); _key("lang", [KEY_L]); _key("log", [KEY_J, KEY_TAB])
 	_key("pause_line", [KEY_P]); _key("replay", [KEY_T]); _key("next_line", [KEY_N, KEY_ENTER])
 	_key("rot_plus", [KEY_R]); _key("rot_minus", [KEY_F]); _key("rot_reset", [KEY_0])
-	_key("slice", [KEY_X]); _key("proj", [KEY_C]); _key("hints", [KEY_H]); _key("menu", [KEY_ESCAPE])
+	_key("slice", [KEY_X]); _key("proj", [KEY_C]); _key("hints", [KEY_H]); _key("menu", [KEY_ESCAPE]); _key("skip", [KEY_K])
 	for i in 6:
 		_key("plane%d" % (i + 1), [KEY_1 + i])
 

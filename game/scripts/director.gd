@@ -9,7 +9,7 @@ signal lesson_started(lesson_id: String)
 signal lesson_finished(lesson_id: String)
 signal cue(lesson_id: String, cue_name: String)
 
-const BARKS := ["respawn", "wlocked", "lock_hint", "lock_hint2"]
+const BARKS := ["respawn", "wlocked", "lock_hint", "lock_hint2", "hint_walk", "hint_door", "hint_bridge", "hint_gate", "skipped", "realm_crystal"]
 
 var voice: AudioStreamPlayer
 var current := ""
@@ -103,6 +103,18 @@ func toggle_pause() -> void:
 	paused = not paused
 	voice.stream_paused = paused
 	G.toast.emit(G.T("Aether paused (P to resume)", "Етер е на пауза (P за продължение)") if paused else G.T("Resumed", "Продължава"))
+
+## Skip the rest of the current lesson but still fire every remaining cue (so abilities unlock).
+func skip_lesson() -> void:
+	if current == "": return
+	var lines: Array = G.lessons[current]["lines"]
+	var lid := current
+	for i in range(maxi(idx + 1, 0), lines.size()):
+		G.heard[lines[i]["id"]] = true
+		if lines[i].get("cue", "") != "":
+			cue.emit(lid, lines[i]["cue"])
+	print("[skip] lesson %s" % lid)
+	_finish()
 
 func current_line() -> Dictionary:
 	if current == "" or idx < 0: return {}

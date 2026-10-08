@@ -17,6 +17,8 @@ var _cp_index := -1
 var args := {}
 var _fps_t := 0.0
 var fps_label: Label
+var task_id := ""
+var task_t := 0.0
 
 const CPS := [
 	{"id": "hub", "z": 99.0, "pos": Vector3(0, 0.3, 3.5), "w": 0.0},
@@ -63,6 +65,10 @@ func _ready() -> void:
 	ui.quit_to_title.connect(_quit_to_title)
 	ui.save_requested.connect(func(): _save(); G.toast.emit(G.T("Game saved", "Играта е запазена")))
 	ui.load_requested.connect(func(): _set_paused(false); _continue())
+	ui.skip_requested.connect(_on_skip_requested)
+	ui.skip_hint.connect(_on_skip_hint)
+	ui.skip_anyway.connect(_on_skip_anyway)
+	ui.skip_cancel.connect(_close_skip_dialog)
 	title_cam.current = true
 	G.playing = false
 	G.settings_changed.connect(_apply_gfx)
@@ -83,6 +89,8 @@ func _ready() -> void:
 	print("[main] ready stations=%s" % [st.keys()])
 	if args.has("autostart") or args.has("bot"):
 		_new_game.call_deferred()
+	if args.has("skiptest"):
+		_skiptest.call_deferred()
 	if args.has("bot"):
 		var b := Node.new(); b.set_script(load("res://scripts/bot.gd")); b.m = self; add_child(b)
 		b.run.call_deferred()
@@ -193,6 +201,9 @@ func _on_lesson_started(id: String) -> void:
 
 func _on_lesson_finished(id: String) -> void:
 	aether.focus_point = null
+	# safety net: finishing (or skipping) a lesson always grants its ability
+	if id == "A" and not G.w_unlocked: G.w_unlocked = true; G.changed.emit()
+	if id == "C" and not G.rot_unlocked: G.rot_unlocked = true; G.changed.emit()
 	for k in st: st[k].on_lesson_finished(id)
 	if director.is_main_lesson(id):
 		_save()
@@ -208,6 +219,13 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventMouseButton and e.pressed and not G.paused and not ui.any_panel_open() \
 			and not G.touch_active() and e.device != InputEvent.DEVICE_ID_EMULATION:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if ui.skip_dialog.visible:
+		if e.is_action_pressed("menu"): _close_skip_dialog()
+		elif e is InputEventKey and e.pressed and not e.echo and e.physical_keycode == KEY_1: _on_skip_hint()
+		elif e is InputEventKey and e.pressed and not e.echo and (e.physical_keycode == KEY_2 or e.physical_keycode == KEY_K): _on_skip_anyway()
+		return
+	if e.is_action_pressed("skip") and not G.paused and ui.skip_btn.visible:
+		_on_skip_requested(); return
 	if e.is_action_pressed("menu"):
 		if ui.log_panel.visible or ui.settings_panel.visible:
 			ui.log_panel.visible = false; ui.settings_panel.visible = false
@@ -234,7 +252,7 @@ func _process(delta: float) -> void:
 		_fps_t = 0.0
 		print("[fps] focus=%s %d proc=%.1fms phys=%.1fms playing=%s paused=%s lesson=%s w=%.2f yaw=%.2f touch=%s pos=%s" % [manip.focused.get_path() if manip.focused else "-", Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, G.playing, G.paused, director.current, G.player_w, player.yaw, G.touch_active(), player.global_position.snapped(Vector3.ONE * 0.1)])
 	if G.paused:
-		if G.playing and not ui.log_panel.visible and not ui.settings_panel.visible and not ui.pause_menu.visible:
+		if G.playing and not ui.log_panel.visible and not ui.settings_panel.visible and not ui.pause_menu.visible and not ui.skip_dialog.visible:
 			ui.show_pause(true)
 		return
 	if not G.playing:
@@ -258,6 +276,7 @@ func _process(delta: float) -> void:
 	_triggers()
 	_checkpoints()
 	ui.objective_text = _objective()
+	_update_skip(delta)
 
 func _triggers() -> void:
 	if director.is_busy() or not director.queue.is_empty(): return
@@ -294,3 +313,118 @@ func _objective() -> String:
 	if not d.has("D"): return G.T("Enter the gallery of the six regular polytopes", "Влез в галерията на шестте правилни политопа")
 	if not d.has("E"): return G.T("Continue to Station V", "Продължи към Станция V")
 	return G.T("Explore freely · try C and X on the polytopes · J = Research Log", "Изследвай свободно · пробвай C и X върху политопите · J = дневник")
+
+# ------------------------------------------------------------------ skip puzzle / task
+const PUZZLES := ["door", "bridge", "gate"]
+const SKIP_DELAY_PUZZLE := 25.0
+const SKIP_DELAY_WALK := 40.0
+
+func current_task() -> String:
+	if director.current != "" and director.is_main_lesson(director.current): return "lesson"
+	var d := G.lessons_done
+	if not d.has("intro"): return "lesson"
+	if not d.has("A"): return "walkA"
+	if not d.has("door_ok"): return "door"
+	if not d.has("B"): return "bridge"
+	if not d.has("C"): return "walkC"
+	if not G.gate_open: return "gate"
+	if not d.has("D"): return "walkD"
+	if not d.has("E"): return "walkE"
+	return ""
+
+func _update_skip(delta: float) -> void:
+	var t := current_task()
+	if t != task_id:
+		task_id = t; task_t = 0.0
+		if t != "": print("[skip] task=%s" % t)
+	task_t += delta
+	var kind := ""
+	if t == "lesson":
+		kind = "lesson" if director.current != "" and task_t > 2.0 else ""
+	elif PUZZLES.has(t):
+		kind = "puzzle" if task_t > SKIP_DELAY_PUZZLE else ""
+	elif t != "":
+		kind = "walk" if task_t > SKIP_DELAY_WALK else ""
+	ui.set_skip(kind)
+
+func _on_skip_requested() -> void:
+	if not G.playing: return
+	var t := current_task()
+	if t == "":
+		G.toast.emit(G.T("Nothing to skip: explore freely!", "Няма какво да се пропуска: изследвай свободно!")); return
+	if t == "lesson":
+		if G.paused: _set_paused(false)
+		if director.current == "": director.play("intro")
+		director.skip_lesson()
+		G.toast.emit(G.T("Lesson skipped (abilities unlocked) · it stays in the Research Log", "Урокът е пропуснат (уменията са отключени) · остава в дневника"))
+		return
+	# puzzles / walking tasks: offer a hint first, then "skip anyway"
+	if not G.paused:
+		G.paused = true; get_tree().paused = true
+	ui.pause_menu.visible = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	ui.open_skip_dialog(_objective())
+	print("[skip] dialog task=%s" % t)
+
+func _close_skip_dialog() -> void:
+	ui.skip_dialog.visible = false
+	_set_paused(false)
+
+func _on_skip_hint() -> void:
+	var t := current_task()
+	_close_skip_dialog()
+	var h := {"door": "hint_door", "bridge": "hint_bridge", "gate": "hint_gate"}.get(t, "hint_walk")
+	director.play(h)
+	task_t = minf(task_t, SKIP_DELAY_PUZZLE)   # keep the skip button available
+	print("[skip] hint %s" % h)
+
+func _on_skip_anyway() -> void:
+	var t := current_task()
+	_close_skip_dialog()
+	solve_task(t)
+
+func _teleport(p: Vector3, w: float = -999.0) -> void:
+	if w > -100.0: G.player_w = w
+	player.global_position = p; player.velocity = Vector3.ZERO
+	player.respawn_point = p; player.respawn_w = G.player_w
+	aether.teleport_to_player()
+
+## Solve a blocking task exactly as the player would have, so saves and progression stay consistent.
+func solve_task(t: String) -> void:
+	print("[skip] solve %s" % t)
+	match t:
+		"walkA": _teleport(Vector3(0, 0.3, -15.0))
+		"door":
+			G.w_unlocked = true; G.lessons_done["door"] = true
+			_teleport(Vector3(0, 0.3, -29.6), 2.0)      # past the Flatland wall, at a w where the bridge exists
+		"bridge":
+			G.w_unlocked = true; G.lessons_done["door"] = true; G.lessons_done["door_ok"] = true
+			_teleport(Vector3(0, 0.3, -41.0), 0.0)
+		"walkC": _teleport(Vector3(0, 0.3, -59.0))
+		"gate":
+			G.rot_unlocked = true; G.lessons_done["lock"] = true
+			gate.solve()
+		"walkD":
+			if not G.gate_open: gate.solve()
+			_teleport(Vector3(0, 0.3, -80.0))
+		"walkE": _teleport(Vector3(0, 0.3, -101.0))
+		_: return
+	G.play_sfx("unlock")
+	G.changed.emit()
+	if PUZZLES.has(t): director.play("skipped")
+	task_t = 0.0
+	_save()
+
+func _skiptest() -> void:
+	# test hook: skip every task in order and report progression
+	await get_tree().create_timer(2.0).timeout
+	for i in 24:
+		var t := current_task()
+		print("[skiptest] step=%d task=%s w_unlocked=%s rot=%s gate=%s done=%s pos=%s w=%.1f" % [i, t, G.w_unlocked, G.rot_unlocked, G.gate_open, G.lessons_done.keys(), player.global_position.snapped(Vector3.ONE * 0.1), G.player_w])
+		if t == "": break
+		if t == "lesson":
+			_on_skip_requested()
+		else:
+			_on_skip_requested(); await get_tree().create_timer(0.3).timeout
+			_on_skip_anyway()
+		await get_tree().create_timer(2.5).timeout
