@@ -427,6 +427,8 @@ func show_title() -> void:
 
 func show_game() -> void:
 	title.visible = false; hud.visible = true; pause_menu.visible = false
+	var V := get_viewport().get_visible_rect().size
+	if _touch_on and V.y > V.x: _rotate_t = 8.0
 
 func show_pause(on: bool) -> void:
 	pause_menu.visible = on
@@ -620,7 +622,10 @@ func _layout() -> void:
 		focus_panel.custom_minimum_size = Vector2(320, 0); focus_label.custom_minimum_size = Vector2(300, 0)
 		_place(focus_panel, Control.PRESET_TOP_RIGHT, Vector2(-14 - ins.size.x, touch.focus_y() + (64 if portrait else 0)), Control.GROW_DIRECTION_BEGIN)
 		eq_panel.scale = Vector2.ONE * 0.62
-		_place(eq_panel, Control.PRESET_CENTER_TOP, Vector2(-24 if not portrait else -136, 50 + ins.position.y + (100 if portrait else 0)), Control.GROW_DIRECTION_BOTH)
+		# scaled about its top-left corner: shift so the *visual* panel is centred (portrait) / left of the top-right buttons
+		var ew: float = eq_panel.get_combined_minimum_size().x
+		var cx: float = (V.x * 0.5) if portrait else 0.5 * ((ins.position.x + 340.0) + (V.x - ins.size.x - 390.0))
+		_place(eq_panel, Control.PRESET_CENTER_TOP, Vector2(cx - V.x * 0.5 + ew * 0.5 - ew * 0.31, (230.0 if portrait else 50.0) + ins.position.y), Control.GROW_DIRECTION_BOTH)
 		var sw: float = (V.x - 24.0) if portrait else minf(860.0, V.x - 500.0)
 		sub_panel.custom_minimum_size = Vector2(sw, 0); sub_text.custom_minimum_size = Vector2(sw - 30, 0)
 		_place(sub_panel, Control.PRESET_CENTER_BOTTOM, Vector2(0, -(250.0 if portrait else 10.0) - ins.size.y), Control.GROW_DIRECTION_BOTH, Control.GROW_DIRECTION_BEGIN)
@@ -642,7 +647,7 @@ func _layout() -> void:
 	var tms := title_box.get_combined_minimum_size()
 	var tsc: float = minf(1.0, minf((V.y - 60.0) / maxf(tms.y, 1.0), (V.x - 48.0) / maxf(tms.x, 1.0)))
 	title_box.scale = Vector2.ONE * tsc
-	title_box.position = Vector2((80 if tsc >= 1.0 else 24) + ins.position.x, (80 if tsc >= 1.0 else 14) + ins.position.y)
+	title_box.position = Vector2((80 if tsc >= 1.0 else 24) + ins.position.x, (80 if tsc >= 1.0 else (60 if portrait and _touch_on else 14)) + ins.position.y)
 	var foot := title.find_child("Foot", true, false) as Label
 	foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	foot.custom_minimum_size = Vector2(minf(1100.0, V.x - 48.0), 0)
