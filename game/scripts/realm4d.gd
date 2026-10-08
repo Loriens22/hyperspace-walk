@@ -448,6 +448,7 @@ func _tasks() -> void:
 			room_seen[best] = true
 			G.settings["realm_room_cells"] = room_seen.keys(); G.save_settings_only()
 			G.play_sfx("ui", -4.0)
+			print("[realm] room cell %s (%d/8)" % [_cell_name(best), room_seen.size()])
 			G.toast.emit(G.T("Room cell %s visited (%d/8)" % [_cell_name(best), room_seen.size()], "Клетка %s (%d/8)" % [_cell_name(best), room_seen.size()]))
 			if room_seen.size() == 8: director.play("realm_room")
 
