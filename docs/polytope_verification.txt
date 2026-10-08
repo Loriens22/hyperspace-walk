@@ -1,0 +1,7 @@
+5cell      {3,3,3}  V,E,F,C=(5, 10, 10, 5) expected=(5, 10, 10, 5) faces/cell=[4] edge=1.581139 euler=0 OK
+tesseract  {4,3,3}  V,E,F,C=(16, 32, 24, 8) expected=(16, 32, 24, 8) faces/cell=[6] edge=1.000000 euler=0 OK
+16cell     {3,3,4}  V,E,F,C=(8, 24, 32, 16) expected=(8, 24, 32, 16) faces/cell=[4] edge=1.414214 euler=0 OK
+24cell     {3,4,3}  V,E,F,C=(24, 96, 96, 24) expected=(24, 96, 96, 24) faces/cell=[8] edge=1.000000 euler=0 OK
+600cell    {3,3,5}  V,E,F,C=(120, 720, 1200, 600) expected=(120, 720, 1200, 600) faces/cell=[4] edge=0.618034 euler=0 OK
+120cell    {5,3,3}  V,E,F,C=(600, 1200, 720, 120) expected=(600, 1200, 720, 120) faces/cell=[12] edge=0.270091 euler=0 OK
+ALL OK
