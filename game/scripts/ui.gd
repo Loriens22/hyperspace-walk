@@ -709,7 +709,9 @@ func _print_menus() -> void:
 			["tset", title.find_child("Set", true, false)], ["trealm", title.find_child("Realm4D", true, false)],
 			["prealm", pause_menu.find_child("Realm", true, false)], ["pskip", pause_menu.find_child("Skip", true, false)], ["resume", pause_menu.find_child("Resume", true, false)],
 			["psettings", pause_menu.find_child("Settings", true, false)], ["pquit", pause_menu.find_child("Quit", true, false)],
-			["sclose", settings_panel.find_child("Close", true, false)], ["stouch", settings_panel.find_child("TouchMode", true, false)]]:
+			["sclose", settings_panel.find_child("Close", true, false)], ["stouch", settings_panel.find_child("TouchMode", true, false)],
+			["shint", skip_dialog.find_child("Hint", true, false)], ["sanyway", skip_dialog.find_child("Anyway", true, false)],
+			["scancel", skip_dialog.find_child("Cancel", true, false)], ["skipbtn", skip_btn]]:
 		var c: Control = pair[1]
 		var r := c.get_global_rect()
 		out.append("%s=%s" % [pair[0], r.get_center().round()])
@@ -757,3 +759,4 @@ func open_skip_dialog(task_text: String) -> void:
 	(skip_dialog.find_child("Cancel", true, false) as Button).text = G.T("Cancel", "Отказ") + ("  [Esc]" if k else "")
 	skip_dialog.visible = true
 	skip_dialog.move_to_front()
+	_print_menus.call_deferred()
