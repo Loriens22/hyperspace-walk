@@ -496,6 +496,7 @@ func _teleport(p: Vector3, w: float = -999.0) -> void:
 ## Solve a blocking task exactly as the player would have, so saves and progression stay consistent.
 func solve_task(t: String) -> void:
 	print("[skip] solve %s" % t)
+	if director.current.begins_with("hint_"): director.skip_lesson()   # the hint is moot once solved
 	match t:
 		"walkA": _teleport(Vector3(0, 0.3, -15.0))
 		"door":
