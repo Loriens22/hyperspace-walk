@@ -171,7 +171,10 @@ func _new_game() -> void:
 			director.play(args["lesson"])
 			for i in int(args.get("skipto", "0")): director._next())
 	elif not G.lessons_done.has("intro"):
-		get_tree().create_timer(1.2).timeout.connect(func(): director.play("intro"))
+		get_tree().create_timer(1.2).timeout.connect(_play_intro)
+
+func _play_intro() -> void:
+	if not G.lessons_done.has("intro"): director.play("intro")
 
 func _continue() -> void:
 	var d := G.load_game()
